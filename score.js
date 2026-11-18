@@ -7,7 +7,7 @@
   // ---------- stockage : une seule photo (IndexedDB) ----------
   const idb = () => new Promise((ok, ko) => { const r = indexedDB.open('accordeur', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => ok(r.result); r.onerror = () => ko(r.error); });
   const kv = async (mode, k, v) => { const db = await idb(); return new Promise((ok, ko) => { const st = db.transaction('kv', mode === 'get' ? 'readonly' : 'readwrite').objectStore('kv'); const q = mode === 'get' ? st.get(k) : mode === 'set' ? st.put(v, k) : st.delete(k); q.onsuccess = () => ok(q.result); q.onerror = () => ko(q.error); }); };
-  const saveScan = () => kv('set', 'scan', { extra: S.extra, scale: S.scale || 1, quarter: S.quarter, angle: S.angle, res: S.res, clef: S.clef, key: S.key, bpm: S.bpm, zoom: S.zoom, edits: S.edits }).catch(() => {});
+  const saveScan = () => kv('set', 'scan', { keyManual: !!S.keyManual, extra: S.extra, scale: S.scale || 1, quarter: S.quarter, angle: S.angle, res: S.res, clef: S.clef, key: S.key, bpm: S.bpm, zoom: S.zoom, edits: S.edits }).catch(() => {});
 
   // ---------- calculs lourds dans un Worker (repli : fil principal) ----------
   let worker = null, wid = 0; const pend = {};
@@ -61,7 +61,7 @@
   function rebuildNotes() {
     S.notes = [];
     if (!S.res || !S.res.staves.length) return;
-    const items = OMR.toNotes(S.res, { clef: S.clef, key: S.key });
+    const items = OMR.toNotes(S.res, { clef: S.clef, key: S.key, keyAuto: !S.keyManual });
     S.extra.forEach((x, k) => { const dia = OMR.CLEF_BASE[S.clef] + x.step; items.push({ id: 2000 + k, staff: x.staff, x: x.x, y: x.y, dia, alter: OMR.keyAlter(dia, S.key), beats: x.beats }); });
     items.sort((a, b) => a.staff - b.staff || a.x - b.x);
     for (const n of items) {
@@ -98,7 +98,7 @@
       x.lineWidth = Math.max(2, d * 0.15); x.strokeStyle = on ? '#2ee59d' : sel ? '#ffb020' : n.rest ? 'rgba(255,150,0,.95)' : 'rgba(255,70,70,.9)';
       x.fillStyle = on ? 'rgba(46,229,157,.45)' : 'rgba(0,0,0,0)';
       x.beginPath(); if (n.rest) x.rect(px - 0.7 * d, py - 1.2 * d, 1.4 * d, 2.4 * d); else x.arc(px, py, 0.85 * d, 0, 7); x.fill(); x.stroke();
-      const t = label(n) + (!n.rest && n.alter > 0 ? '♯' : !n.rest && n.alter < 0 ? '♭' : '');
+      const t = label(n) + (!n.rest && n.alter > 0 ? '♯' : !n.rest && n.alter < 0 ? '♭' : !n.rest && n.acc === 0 ? '♮' : '');
       x.fillStyle = 'rgba(255,255,255,.88)'; const tw = x.measureText(t + ' ' + beatsTxt(n.beats)).width + 6, ty = py + (n.y < S.res.staves[n.staff].lines[2] ? -1.3 * d : 2.1 * d);
       x.fillRect(px - tw / 2, ty - 1.0 * d, tw, 1.25 * d);
       x.fillStyle = on ? '#007a4f' : '#0a2a8a'; x.fillText(t + ' ' + beatsTxt(n.beats), px, ty);
@@ -127,7 +127,7 @@
     const kb = $('sc-key'); kb.innerHTML = ''; const sel = document.createElement('select');
     sel.style.cssText = 'padding:9px 12px;border-radius:12px;border:0;background:var(--card);color:var(--fg);font-size:16px';
     keys.forEach(([t, v]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; if (v === S.key) o.selected = true; sel.appendChild(o); });
-    sel.onchange = () => { S.key = +sel.value; refresh(); }; kb.appendChild(sel);
+    sel.onchange = () => { S.key = +sel.value; S.keyManual = true; refresh(); }; kb.appendChild(sel);
     $('sc-bpm').textContent = S.bpm; $('sc-tempo').value = S.bpm;
     $('sc-play').textContent = tr(S.playing ? 'score.stop' : 'score.play');
     S.crop = cropBox(); draw();
@@ -143,7 +143,7 @@
       <div class="lbl">${tr('edit.alter')}</div><div class="chips"><button data-a="alt-1" class="${n.alter < 0 ? 'on' : ''}">♭</button><button data-a="alt0" class="${n.alter === 0 ? 'on' : ''}">♮</button><button data-a="alt1" class="${n.alter > 0 ? 'on' : ''}">♯</button></div>`}
       <div class="lbl">${tr('edit.dur')}</div><div class="chips">${DURS.map(b => `<button data-a="d${b}" class="${b === base ? 'on' : ''}">${tr('dur.' + b)}</button>`).join('')}<button data-a="dot" class="${dot ? 'on' : ''}">${tr('edit.dot')}</button></div>
       <div class="chips" style="margin-top:12px"><button class="del" data-a="del">${tr('edit.delete')}</button><button data-a="close">${tr('edit.close')}</button></div>`;
-    sh.querySelector('h3').textContent = label(n) + (!n.rest && n.alter > 0 ? '♯' : !n.rest && n.alter < 0 ? '♭' : '');
+    sh.querySelector('h3').textContent = label(n) + (!n.rest && n.alter > 0 ? '♯' : !n.rest && n.alter < 0 ? '♭' : !n.rest && n.acc === 0 ? '♮' : '');
     sh.classList.add('on');
     sh.querySelectorAll('button').forEach(b => b.onclick = () => {
       const a = b.dataset.a, e = S.edits[n.id] = S.edits[n.id] || {};
@@ -206,7 +206,7 @@
     stopPlay(); S.busy = true; S.blob = null; S.res = null; S.edits = {}; S.sel = -1; S.notes = []; closeSheet(); render();
     try {
       S.blob = await downscale(file); await kv('set', 'photo', S.blob);
-      S.zoom = 0; S.clef = null; S.key = 0; await analyze(S.blob); rebuildNotes(); await saveScan();
+      S.zoom = 0; S.clef = null; S.key = 0; S.keyManual = false; await analyze(S.blob); rebuildNotes(); await saveScan();
     } catch (e) { S.res = { staves: [], heads: [] }; }
     S.busy = false; render();
   }
@@ -234,7 +234,7 @@
       const blob = await kv('get', 'photo'), scan = await kv('get', 'scan');
       if (blob) {
         S.blob = blob;
-        if (scan && scan.res) { Object.assign(S, { extra: scan.extra || [], scale: scan.scale || 1, quarter: scan.quarter, angle: scan.angle, res: scan.res, clef: scan.clef, key: scan.key, bpm: scan.bpm || 90, zoom: scan.zoom || 0, edits: scan.edits || {} }); S.base = await renderBase(blob, S.quarter, S.angle, S.scale || 1); }
+        if (scan && scan.res) { Object.assign(S, { keyManual: !!scan.keyManual, extra: scan.extra || [], scale: scan.scale || 1, quarter: scan.quarter, angle: scan.angle, res: scan.res, clef: scan.clef, key: scan.key, bpm: scan.bpm || 90, zoom: scan.zoom || 0, edits: scan.edits || {} }); S.base = await renderBase(blob, S.quarter, S.angle, S.scale || 1); }
         else { await analyze(blob); }
         S.clef = S.clef || defClef(); rebuildNotes();
       }

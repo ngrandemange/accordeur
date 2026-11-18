@@ -122,6 +122,8 @@ const OMR = (() => {
     }
     return B3;
   }
+  // ellipse inclinée de th radians (têtes de notes penchées, polices italiques)
+  const ellipseRot = (a, b, th) => { const o = [], c = Math.cos(th), s = Math.sin(th), R = Math.ceil(Math.max(a, b)); for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) { const u = dx * c + dy * s, v = -dx * s + dy * c; if ((u * u) / (a * a) + (v * v) / (b * b) <= 1) o.push([dx, dy]); } return o; };
   const ellipse = (a, b) => { const o = []; for (let dy = -Math.ceil(b); dy <= Math.ceil(b); dy++) for (let dx = -Math.ceil(a); dx <= Math.ceil(a); dx++) if ((dx * dx) / (a * a) + (dy * dy) / (b * b) <= 1) o.push([dx, dy]); return o; };
   function components(mask, w, h, x0, y0, x1, y1) {   // composantes connexes d'un masque, centroïdes
     const seen = new Uint8Array(w * h), out = [];
@@ -231,7 +233,7 @@ const OMR = (() => {
       const dir = side === 1 ? -1 : 1;
       for (let o = 0.40; o <= 0.78; o += 0.04) {
         const x = Math.round(hd.x + side * o * d), y = Math.round(hd.y + dir * 0.2 * d);
-        const n = runLen(B2, w, h, x, y, dir, 5.5 * d);
+        const n = runLen(B2, w, h, x, y, dir, 7.5 * d);
         if (!best || n > best.len) best = { len: n, dir, x, y: hd.y };
       }
     }
@@ -359,7 +361,7 @@ const OMR = (() => {
       if (Math.abs(wd - t.w) > Math.max(0.3, 0.38 * t.w) || Math.abs(hd - t.h) > Math.max(0.35, 0.30 * t.h)) continue;
       const sc = gridScore(g, t.grid); if (sc > best.score) best = { type: name, score: sc };
     }
-    return best.score >= minScore ? best : { type: null, score: best.score };
+    return best.score >= minScore ? best : { type: null, score: best.score, guess: best.type };
   }
   // Morceaux voisins d'un même symbole (trait coupé par une ligne de portée) : tente la fusion de c avec les 1-2 suivants.
   function mergeTry(cs, k, s, lab, w, TPL, accept) {
@@ -418,9 +420,48 @@ const OMR = (() => {
     const top = s.lines[0], bot = s.lines[4], st = (bot - top) / 4, d = s.d;
     let dist, base, sign; if (hd.y < top) { dist = top - hd.y; base = top; sign = -1; } else if (hd.y > bot) { dist = hd.y - bot; base = bot; sign = 1; } else return true;
     const m = Math.floor((dist + 0.25 * st) / st); if (m < 1) return true;
-    const yl = Math.round(base + sign * m * st); let best = 0;
-    for (let dy = -1; dy <= 1; dy++) { let n = 0, tot = 0; for (let x = Math.round(hd.x - 0.7 * d); x <= Math.round(hd.x + 0.7 * d); x++) { tot++; if (B[(yl + dy) * w + x]) n++; } best = Math.max(best, n / tot); }
-    return best >= 0.85;
+    return ledgerAt(B, w, h, Math.round(base + sign * m * st), hd.x, d);
+  }
+  // Ligne supplémentaire en (x, yl) : trait noir fin de 1.3d à 3d de long, avec du blanc juste au-dessus et au-dessous de ses extrémités.
+  function ledgerAt(B, w, h, yl, x, d) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const y = yl + dy; if (y < 3 || y >= h - 3 || !B[y * w + Math.round(x)]) { if (!B[y * w + Math.round(x)] && !B[y * w + Math.round(x - 0.3 * d)] && !B[y * w + Math.round(x + 0.3 * d)]) continue; }
+      let a = Math.round(x), b = Math.round(x); while (a > 0 && B[y * w + a - 1]) a--; while (b < w - 1 && B[y * w + b + 1]) b++;
+      const len = b - a + 1; if (len < 1.3 * d || len > 3.2 * d) continue;
+      const th = (yy) => !B[(yy) * w + a + 1] && !B[(yy) * w + b - 1];         // ni au-dessus ni au-dessous des extrémités
+      if (th(y - 3) && th(y + 3)) return true;
+    }
+    return false;
+  }
+  // Efface des matrices les composantes d'annotation (texte, nuances, coups d'archet, numéros de mesure…) : entièrement hors portée et sans ligne supplémentaire.
+  function eraseAnnotations(mats, lab, comps, w, h, s, B) {
+    const d = s.d, top = s.lines[0], bot = s.lines[4], st = (bot - top) / 4, keep = [];
+    for (const c of comps) {
+      const above = c.y1 < top - 1.15 * d, below = c.y0 > bot + 1.15 * d;
+      if (!(above || below) || c.used) { keep.push(c); continue; }
+      let ledger = false; const sign = above ? -1 : 1, base = above ? top : bot;
+      for (let m = 1; m <= 8 && !ledger; m++) { const yl = Math.round(base + sign * m * st); if (yl < c.y0 - 2 || yl > c.y1 + 2) continue; ledger = ledgerAt(B, w, h, yl, c.cx, d) || ledgerAt(B, w, h, yl, c.x0 + 0.8 * d, d) || ledgerAt(B, w, h, yl, c.x1 - 0.8 * d, d); }
+      if (ledger) { keep.push(c); continue; }
+      for (let y = c.y0; y <= c.y1; y++) for (let x = c.x0; x <= c.x1; x++) if (lab[y * w + x] === c.id) { lab[y * w + x] = 0; for (const M of mats) M[y * w + x] = 0; }
+    }
+    return keep;
+  }
+  // Le trou d'une tête creuse est une petite région blanche FERMÉE (sinon : boucle d'un crochet, d'une liaison, d'un chiffre…).
+  function holeEnclosed(M, w, h, x, y, d) {
+    const R = Math.round(1.15 * d), near = (px, py) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (M[(py + dy) * w + px + dx]) return true; return false; };
+    // départ : pixel clair le plus proche du centre (la ligne de portée / un reste de ligne peut barrer le trou)
+    let sx = -1, sy = -1; for (let r = 0; r <= 4 && sx < 0; r++) for (let dy = -r; dy <= r && sx < 0; dy++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; if (!M[(Math.round(y) + dy) * w + Math.round(x) + dx]) { sx = Math.round(x) + dx; sy = Math.round(y) + dy; break; } }
+    if (sx < 0) return false;
+    const seen = new Set([sy * w + sx]), st = [[sx, sy]], maxA = 0.75 * d * d; let area = 0;
+    while (st.length) {
+      const [cx, cy] = st.pop(); area++; if (area > maxA) return false;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = cx + dx, ny = cy + dy;
+        if (Math.abs(nx - x) > R || Math.abs(ny - y) > R) return false;            // fuit hors de la zone : trou ouvert
+        if (M[ny * w + nx] || seen.has(ny * w + nx)) continue;
+        if (area > 6 && near(nx, ny) && !near(cx, cy)) { /* franchit un petit goulot (≤ 2 px) : on bloque */ continue; }
+        seen.add(ny * w + nx); st.push([nx, ny]); }
+    }
+    return true;
   }
   // Étape 2 : type de chaque composante hors tête (altération, silence, barre…).
   function typeComps(w, h, s, heads, comps, lab, TPL, out, si) {
@@ -431,14 +472,41 @@ const OMR = (() => {
       if (out.raw && !(c.w < 0.45 * d && c.h > 2.5 * d)) out.raw.push({ staff: si, x: c.cx, xRel: (c.x0 - s.x0) / d, wd: c.w / d, hd: c.h / d, area: c.area / (d * d), grid: Array.from(gridOf(lab, w, c)) });
       if (c.w < 0.45 * d && c.h > 2.5 * d) { c.type = 'bar'; continue; }
       if (c.w > 3.6 * d || c.h > 5.2 * d) { c.type = 'other'; continue; }
-      const sy = classifySymbol(c, s, lab, w, TPL); c.type = sy.type || 'other'; c.score = sy.score;
+      const sy = classifySymbol(c, s, lab, w, TPL); c.type = sy.type || 'other'; c.score = sy.score; c.guess = sy.guess;
     }
     const rs = rest.filter(c => c.type === 'other' && c.area < 1.2 * d * d).sort((a, b) => a.x0 - b.x0);       // morceaux d'altérations coupés par une ligne
     for (let k = 0; k < rs.length; k++) { const mg = mergeTry(rs, k, s, lab, w, TPL, q => q === 'sharp' || q === 'flat' || q === 'natural'); if (mg) { mg.parts.forEach(p => { p.type = 'other'; p.used = 'part'; }); const m = mg.m; m.type = mg.type; m.id = mg.parts[0].id; comps.push(m); k += mg.parts.length - 1; } }
     return headComp;
   }
+  // Altération touchant la tête (composante fusionnée) : on isole les pixels à gauche de la tête et on les classe.
+  function splitAccidental(B3, lab, w, h, s, hd, TPL) {
+    const d = s.d, id = lab[Math.round(hd.y) * w + Math.round(hd.x)] || lab[Math.round(hd.y) * w + Math.round(hd.x - 0.5 * d)] || 0;
+    if (!id) return null;
+    const xa = Math.round(hd.x - 3.0 * d), xb = Math.round(hd.x - 0.72 * d), ya = Math.round(hd.y - 1.9 * d), yb = Math.round(hd.y + 1.9 * d);
+    const px = []; let x0 = 1e9, x1 = -1, y0 = 1e9, y1 = -1;
+    const top = s.lines[0], bot = s.lines[4], st = (bot - top) / 4, onLedger = y => { for (let m = 1; m <= 8; m++) if (Math.abs(y - (top - m * st)) <= 2 || Math.abs(y - (bot + m * st)) <= 2) return true; return false; };
+    const thinRun = (x, y) => { let n = 1, u = y, v = y; while (B3[(u - 1) * w + x] && n < 6) { u--; n++; } while (B3[(v + 1) * w + x] && n < 6) { v++; n++; } return n <= 3; };
+    for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) if (B3[y * w + x] && lab[y * w + x] === id && !(onLedger(y) && thinRun(x, y))) { px.push(x, y); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const n = px.length / 2; if (n < 0.3 * d * d) return null;
+    // le morceau doit se terminer près de la tête (sinon : stem, liaison…) ; on garde la partie contiguë la plus à droite
+    const cols = new Array(x1 - x0 + 1).fill(0); for (let i = 0; i < px.length; i += 2) cols[px[i] - x0]++;
+    let e = cols.length - 1; while (e >= 0 && !cols[e]) e--; let b = e; let gap = 0; while (b >= 0 && gap <= 2) { if (cols[b]) gap = 0; else gap++; b--; } b = Math.max(0, b + 1 + gap);
+    const sel = []; let mnx = 1e9, mxx = -1, mny = 1e9, mxy = -1;
+    for (let i = 0; i < px.length; i += 2) { const x = px[i], y = px[i + 1]; if (x - x0 >= b && x - x0 <= e) { sel.push(x, y); mnx = Math.min(mnx, x); mxx = Math.max(mxx, x); mny = Math.min(mny, y); mxy = Math.max(mxy, y); } }
+    const cw = mxx - mnx + 1, ch = mxy - mny + 1; if (cw < 0.45 * d || cw > 1.5 * d || ch < 1.7 * d || ch > 3.6 * d) return null;
+    // empreinte des pixels retenus
+    const g = new Float32Array(GW * GH), cnt = new Float32Array(GW * GH), set = new Set(); for (let i = 0; i < sel.length; i += 2) set.add(sel[i + 1] * w + sel[i]);
+    for (let y = mny; y <= mxy; y++) for (let x = mnx; x <= mxx; x++) { const gx = Math.min(GW - 1, Math.floor((x - mnx) * GW / cw)), gy = Math.min(GH - 1, Math.floor((y - mny) * GH / ch)), k = gy * GW + gx; cnt[k]++; if (set.has(y * w + x)) g[k]++; }
+    for (let k = 0; k < g.length; k++) g[k] = cnt[k] ? g[k] / cnt[k] : 0;
+    let best = { type: null, score: 0 }; const wd = cw / d, hd2 = ch / d;
+    for (const [name, t] of Object.entries(TPL || {})) {
+      if (!/^(sharp|flat|natural)$/.test(name) || Math.abs(wd - t.w) > Math.max(0.3, 0.38 * t.w) || Math.abs(hd2 - t.h) > Math.max(0.4, 0.3 * t.h)) continue;
+      const sc = gridScore(g, t.grid); if (sc > best.score) best = { type: name, score: sc };
+    }
+    return best.score >= 0.42 ? best.type : null;
+  }
   // Étape 3 : rattache altérations aux notes, enregistre les silences.
-  function attachSymbols(B, B2, w, h, s, si, heads, comps, headComp, out) {
+  function attachSymbols(B, B2, w, h, s, si, heads, comps, headComp, out, B3, lab, TPL) {
     const d = s.d, top = s.lines[0], bot = s.lines[4];
     s.bars = findBars(B, w, h, s);
     const accs = comps.filter(c => /^(sharp|flat|natural)$/.test(c.type || '')), rests = comps.filter(c => /^rest/.test(c.type || '') && c.cy > top - 0.8 * d && c.cy < bot + 0.8 * d);
@@ -446,12 +514,25 @@ const OMR = (() => {
       let best = null, bd = 1e9;
       for (const a of accs) { const dx = hd.x - a.cx; if (dx < 0.4 * d || dx > 3.0 * d || Math.abs(a.cy - hd.y) > 1.7 * d || a.used) continue; if (dx < bd) { bd = dx; best = a; } }
       if (best) { hd.acc = best.type === 'sharp' ? 1 : best.type === 'flat' ? -1 : 0; best.used = 'acc'; }
+      else if (B3 && TPL) { const t = splitAccidental(B3, lab, w, h, s, hd, TPL); if (t) hd.acc = t === 'sharp' ? 1 : t === 'flat' ? -1 : 0; }
+    }
+    // altérations restées sans note, juste après une barre de mesure : changement d'armure (ex. ♯♯ ou ♮ d'annulation)
+    s.keyChanges = [];
+    const free = accs.filter(a => !a.used).sort((a, b) => a.x0 - b.x0);
+    for (let i = 0; i < free.length;) {
+      const a0 = free[i], nb = (s.bars || []).some(bx => a0.x0 - bx > 0.2 * d && a0.x0 - bx < 3.4 * d);
+      let j = i; while (j + 1 < free.length && free[j + 1].x0 - free[j].x1 < 1.6 * d) j++;
+      if (nb) {
+        const grp = free.slice(i, j + 1), sh = grp.filter(g => g.type === 'sharp').length, fl = grp.filter(g => g.type === 'flat').length;
+        s.keyChanges.push({ x: free[j].x1, key: sh > fl ? sh : fl > sh ? -fl : 0 }); grp.forEach(g => { g.used = 'keychange'; });
+      }
+      i = j + 1;
     }
     for (const c of rests) {
       const beats = { rest1: 4, rest2: 2, rest4: 1, rest8: 0.5, rest16: 0.25 }[c.type];
       out.rests.push({ x: c.cx, y: c.cy, staff: si, beats: beats * (dotAfter(B2, w, h, c.x1 + 0.2 * d, c.cy - (c.type === 'rest4' ? 0.3 : 0) * d, d) ? 1.5 : 1), type: c.type });
     }
-    out.comps.push(...comps.map(c => ({ staff: si, x: c.cx, y: c.cy, w: c.w, h: c.h, type: c.used || c.type || (headComp.has(c.id) ? 'head' : null) })));
+    out.comps.push(...comps.map(c => ({ staff: si, x: c.cx, y: c.cy, w: c.w, h: c.h, score: c.score, guess: c.guess, cls: c.type, type: c.used || c.type || (headComp.has(c.id) ? 'head' : null) })));
   }
   function analyzeStraight(g, w, h, dbg, TPL) {
     const B = binarize(g, w, h), box = paperBox(g, w, h); maskOutside(B, w, h, box);
@@ -464,10 +545,11 @@ const OMR = (() => {
     if (dbg && dbg.collect) out.raw = [];
     const B3 = repairLines(B, B2, w, h, staves);
     staves.forEach((s, si) => {
-      const comps = readHeader(B3, w, h, s, lab, TPL, out), d = s.d;
+      let comps = readHeader(B3, w, h, s, lab, TPL, out); const d = s.d;
+      comps = eraseAnnotations([B, B2, B3], lab, comps, w, h, s, B);
       // 1) têtes pleines  2) types des autres composantes  3) têtes creuses (seulement hors altérations / silences / barres)
       const hs0 = findHeads(B, B2, w, h, s, si === 0 ? dbg : null, null), cById = new Map(comps.map(c => [c.id, c]));
-      const hs = hs0.filter(hd => { const c = cById.get(lab[Math.round(hd.y) * w + Math.round(hd.x)]); return !c || c.h >= 1.6 * d; });
+      const hs = hs0.filter(hd => { const c = cById.get(lab[Math.round(hd.y) * w + Math.round(hd.x)]); return !c || c.h >= 0.85 * d; });
       for (const hd of hs) { addStem(B2, w, h, hd, d); classify(B2, w, h, hd, d); }
       const headComp = typeComps(w, h, s, hs, comps, lab, TPL, out, si), byId = new Map(comps.map(c => [c.id, c]));
       const ok = (x, y) => {                       // la tête creuse est l'union des morceaux d'anneau autour de (x, y)
@@ -478,12 +560,25 @@ const OMR = (() => {
         for (const id of ids) { const c = byId.get(id); if (!c) continue;
           if (headComp.has(c.id) || /^(sharp|flat|natural|bar|rest)/.test(c.type || '') || c.used === 'clef' || c.used === 'key') return false;
           x0 = Math.min(x0, c.x0); x1 = Math.max(x1, c.x1); y0 = Math.min(y0, c.y0); y1 = Math.max(y1, c.y1); }
-        return (x1 - x0 + 1) >= 1.1 * d && (y1 - y0 + 1) >= 0.8 * d && (y1 - y0 + 1) <= 5.2 * d;
+        const hh = y1 - y0 + 1; if ((x1 - x0 + 1) < 1.1 * d || hh < 0.8 * d || hh > 7.8 * d) return false;
+        if (hh > 5.2 * d) {                         // comp. très haute : tolérée si l'excédent (en haut ou en bas) est un petit signe (coup d'archet) et non une ligature
+          const ex = Math.round(hh - 5.2 * d + 0.4 * d); let okTop = true, okBot = true;
+          for (const [ya, yb, flag] of [[y0, y0 + ex, 'top'], [y1 - ex, y1, 'bot']]) {
+            let cnt = 0, mr = 0; for (let yy = ya; yy <= yb; yy++) { let run = 0; for (let xx = x0; xx <= x1; xx++) { if (B2[yy * w + xx]) { cnt++; run++; if (run > mr) mr = run; } else run = 0; } }
+            const good = mr <= 1.9 * d && cnt <= 1.3 * d * d; if (flag === 'top') okTop = good; else okBot = good;
+          }
+          if (!(okTop || okBot)) return false;
+        }
+        return true;
       };
       for (const hd of findHeads(B, B2, w, h, s, null, ok)) if (hd.hollow) { hd.staff = si; addStem(B2, w, h, hd, d); classify(B2, w, h, hd, d); hs.push(hd); }
       hs.forEach(hd => { hd.staff = si; });
+      for (let k = hs.length - 1; k >= 0; k--) {                    // boucle de crochet = « tête creuse » au bout de la hampe d'une tête pleine
+        const q = hs[k]; if (!q.hollow) continue;
+        if (hs.some(f => !f.hollow && f.stem && Math.abs(q.y - f.stem.endY) < 1.3 * d && q.x - f.stem.x > -0.4 * d && q.x - f.stem.x < 1.5 * d)) hs.splice(k, 1);
+      }
       for (let k = hs.length - 1; k >= 0; k--) if (!ledgerOK(B, w, h, s, hs[k])) hs.splice(k, 1);
-      attachSymbols(B, B2, w, h, s, si, hs, comps, headComp, out);
+      attachSymbols(B, B2, w, h, s, si, hs, comps, headComp, out, B3, lab, TPL);
       heads.push(...hs);
     });
     // une tête n'appartient qu'à la portée la plus proche (les zones de recherche de portées voisines se recouvrent)
@@ -494,11 +589,11 @@ const OMR = (() => {
     const clef = mode(staves.map(s => s.clef).filter(Boolean));
     const ks = staves.map(s => s.key), nz = ks.filter(k => k !== 0);        // une armure oubliée sur une portée est plus probable qu'une armure inventée
     const key = nz.length && nz.length >= Math.ceil(ks.length / 4) ? mode(nz) : 0;
-    if (dbg) { dbg.B2 = B2; dbg.lab = lab; dbg.raw = out.raw; }
+    if (dbg) { dbg.B2 = B2; dbg.B3 = B3; dbg.lab = lab; dbg.raw = out.raw; }
     return { staves, heads, rests: out.rests, comps: out.comps, clef, key: key == null ? 0 : +key, box };
   }
   // Convertit les têtes détectées en notes jouables (hauteur diatonique + durée en temps).
-  function toNotes(res, { clef = 'alto', key = 0 } = {}) {
+  function toNotes(res, { clef = 'alto', key = 0, keyAuto = false } = {}) {
     const base = CLEF_BASE[clef] ?? 24, items = [];
     for (const [id, hd] of res.heads.entries()) {
       const s = res.staves[hd.staff], bot = s.lines[4], half = s.d / 2;
@@ -519,8 +614,9 @@ const OMR = (() => {
       const m = bars.filter(bx => bx < n.x - 2).length;
       if (m !== meas) { meas = m; memo = {}; }
       if (n.rest) continue;
+      let kk = keyAuto && res.staves[cur].hasHeader ? res.staves[cur].key : key; for (const kc of (res.staves[cur].keyChanges || [])) if (kc.x <= n.x) kk = kc.key;
       if (n.acc !== undefined) memo[n.dia] = n.acc;
-      n.alter = memo[n.dia] !== undefined ? memo[n.dia] : keyAlter(n.dia, key);
+      n.alter = memo[n.dia] !== undefined ? memo[n.dia] : keyAlter(n.dia, kk);
     }
     return items;
   }
@@ -533,6 +629,6 @@ const OMR = (() => {
   const midiOf = n => 12 * (Math.floor(n.dia / 7) + 1) + SEMI[((n.dia % 7) + 7) % 7] + n.alter;
   const freqOf = (n, a4 = 440) => a4 * Math.pow(2, (midiOf(n) - 69) / 12);
   const nameOf = n => LETTERS[((n.dia % 7) + 7) % 7] + (n.alter > 0 ? '♯' : n.alter < 0 ? '♭' : '') + Math.floor(n.dia / 7);
-  return { _i: { removeLines, ellipse, hollowDiag, paperBox, dotAfter, countRuns }, CLEF_BASE, toGray, binarize, estimateAngle, findStaves, analyzeStraight, analyzeGray, toNotes, keyAlter, midiOf, freqOf, nameOf };
+  return { _i: { removeLines, ellipse, hollowDiag, paperBox, dotAfter, countRuns, splitAccidental }, CLEF_BASE, toGray, binarize, estimateAngle, findStaves, analyzeStraight, analyzeGray, toNotes, keyAlter, midiOf, freqOf, nameOf };
 })();
 if (typeof module !== 'undefined') module.exports = OMR;

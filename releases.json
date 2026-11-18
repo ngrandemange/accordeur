@@ -1,5 +1,21 @@
 [
  {
+  "version": "1.8.0",
+  "date": "2026-11-18",
+  "fr": [
+   "Partition : les notes collées à un dièse, un bécarre ou un bémol sont de nouveau reconnues, et le bécarre s'affiche (♮)",
+   "Partition : changements d'armure en cours de ligne (ex. ♯♯ ou ♮ d'annulation) pris en compte",
+   "Partition : nuances (p, mf, f, crescendo), coups d'archet et textes sont ignorés",
+   "Partition : moins de fausses blanches (boucles des crochets, chiffres, lettres)"
+  ],
+  "en": [
+   "Score: notes touching a sharp, natural or flat are recognised again, and the natural is shown (♮)",
+   "Score: key signature changes within a line (e.g. ♯♯ or cancelling ♮) are taken into account",
+   "Score: dynamics (p, mf, f, hairpins), bowing marks and text are ignored",
+   "Score: fewer false half notes (flag loops, digits, letters)"
+  ]
+ },
+ {
   "version": "1.7.0",
   "date": "2026-11-18",
   "fr": [

@@ -6,6 +6,7 @@ const CASES = [
   ['t2.png', 'alto', 2, 'D4:1.5 E4:0.5 F♯4:1 r:1 G4:1 G♯4:1 A4:1 r:0.5 B4:0.5 C♯5:1 C5:1 D5:2 r:2 r:1 r:0.5 E5:0.5 F♯5:0.25 G5:0.25 r:0.25 A5:0.25 B4:1 r:1 D4:4', 1.0],
   ['t3.png', 'treble', -2, 'B♭4:1 A4:1 B4:1 E♭5:1.5 D5:0.5 r:1 G♭5:1 F5:0.5 r:0.5 E5:1 r:1 r:0.5 C5:0.5 D5:1 B♭4:3 r:3', 1.0],
   ['t4.png', 'bass', 4, 'E3:1 F♯3:1 G♯3:0.5 r:0.5 A3:1 B3:1 B♯3:1 r:1 r:0.5 C♯4:0.5 D♯4:2 E3:2', 1.0],
+  ['t5.png', 'alto', 1, 'G4:1 A4:1 B4:1 C♯5:1 C5:1 D5:1 E5:1 F♯5:1 F5:1 G5:2 r:1 G4:2 F♯4:1 r:0.5 G4:0.5', 1.0],   // nuances, crescendo, coups d'archet, bécarre collé à la tête
   ['d1.jpg', 'alto', 0, 'C4:1 D4:1 E4:1 F4:1 G4:2 A4:2 B4:0.5 C5:0.5 D5:0.5 E5:0.5 F5:1 E5:1 C5:4 G3:1 A3:1 B3:1 C4:1 C3:0.5 D3:0.5 E3:0.5 F3:0.5 G3:1 G3:1 F5:0.25 E5:0.25 D5:0.25 C5:0.25 B4:0.5 A4:0.5 G4:1 C4:4', 0.85],   // t1 « photographiée » (inclinée, ombrée, floue)
 ];
 (async () => {
