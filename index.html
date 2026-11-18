@@ -47,6 +47,8 @@ nav button{width:56px;height:46px;border:0;border-radius:14px;background:transpa
 nav button svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #ver{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums}
 nav{position:sticky}
+nav{min-height:62px}
+nav.home button{display:none}
 nav button.on{background:var(--card);color:var(--ok)}
 .view{display:none;flex:1;width:100%;max-width:460px;flex-direction:column;align-items:center}
 .view.on{display:flex}
@@ -482,6 +484,7 @@ function route(){
   if (page !== 'metronome') stopMetro();
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'v-' + page));
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.go === page));
+  document.querySelector('nav').classList.toggle('home', page === 'accueil');
 }
 document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { location.hash = b.dataset.go; });
 window.addEventListener('hashchange', route);
