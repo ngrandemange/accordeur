@@ -48,7 +48,6 @@ nav button svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width
 #ver{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums}
 nav{position:sticky}
 nav{min-height:62px}
-nav.home button{display:none}
 nav button.on{background:var(--card);color:var(--ok)}
 .view{display:none;flex:1;width:100%;max-width:460px;flex-direction:column;align-items:center}
 .view.on{display:flex}
@@ -95,20 +94,39 @@ nav button.on{background:var(--card);color:var(--ok)}
 #ptr svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
 #ptr.spin svg{animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+nav .cfg{position:absolute;left:16px;top:50%;transform:translateY(-50%);width:44px}
+nav.home button:not(.cfg){display:none}
+#ver{cursor:pointer;padding:8px}
+#v-reglages{align-items:stretch;gap:10px;padding-bottom:30px}
+#v-reglages h2{font-size:22px;margin:14px 0 0}
+#v-reglages .chips{justify-content:flex-start}
+#v-reglages p{color:var(--mut);font-size:14px;line-height:1.45;margin:4px 0}
+.rel{background:var(--card);border-radius:12px;padding:10px 14px;margin:6px 0}
+.rel summary{font-weight:600;cursor:pointer}
+.rel summary small{color:var(--mut);font-weight:400;margin-left:8px}
+.rel ul{margin:8px 0 2px;padding-left:20px;font-size:14px;color:var(--fg)}
+#modal{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:24px}
+#modal.on{display:flex}
+#modal .box{background:var(--card);border-radius:18px;padding:20px;max-width:380px;width:100%}
+#modal h3{margin:0 0 8px;font-size:20px}
+#modal ul{padding-left:20px;margin:8px 0 16px;font-size:15px;line-height:1.4}
+#modal button{width:100%;padding:12px;border:0;border-radius:12px;background:var(--ok);color:#04130c;font-size:17px;font-weight:700}
 </style>
 </head>
 <body>
 <nav>
-  <button data-go="accueil" aria-label="Accueil"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg></button>
-  <button data-go="accordeur" aria-label="Accordeur"><svg viewBox="0 0 24 24"><path d="M3.5 17a8.5 8.5 0 0 1 17 0"/><path d="M12 17 16.5 9"/><circle cx="12" cy="17" r="1.2"/><path d="M12 8.5V7M6.8 10.3l-.9-.9M17.2 10.3l.9-.9"/></svg></button>
-  <button data-go="metronome" aria-label="Métronome"><svg viewBox="0 0 24 24"><path d="M8.5 3h7l3.5 17.5H5z"/><path d="M12 16.5 15.5 7"/><path d="M13.3 10.5h3.2"/></svg></button>
+  <button data-go="accueil" data-i18n-aria="nav.home"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg></button>
+  <button data-go="accordeur" data-i18n-aria="nav.tuner"><svg viewBox="0 0 24 24"><path d="M3.5 17a8.5 8.5 0 0 1 17 0"/><path d="M12 17 16.5 9"/><circle cx="12" cy="17" r="1.2"/><path d="M12 8.5V7M6.8 10.3l-.9-.9M17.2 10.3l.9-.9"/></svg></button>
+  <button data-go="metronome" data-i18n-aria="nav.metro"><svg viewBox="0 0 24 24"><path d="M8.5 3h7l3.5 17.5H5z"/><path d="M12 16.5 15.5 7"/><path d="M13.3 10.5h3.2"/></svg></button>
+  <button class="cfg" data-go="reglages" data-i18n-aria="nav.settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 14.5a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3h0a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8v0a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></button>
   <span id="ver"></span>
 </nav>
 
 <section class="view" id="v-accueil">
   <div class="isles">
-    <button class="isle t" data-go="accordeur"><svg viewBox="0 0 24 24"><path d="M3.5 17a8.5 8.5 0 0 1 17 0"/><path d="M12 17 16.5 9"/><circle cx="12" cy="17" r="1.2"/><path d="M12 8.5V7M6.8 10.3l-.9-.9M17.2 10.3l.9-.9"/></svg>Accordeur<small>Alto · Violon · Guitare</small></button>
-    <button class="isle m" data-go="metronome"><svg viewBox="0 0 24 24"><path d="M8.5 3h7l3.5 17.5H5z"/><path d="M12 16.5 15.5 7"/><path d="M13.3 10.5h3.2"/></svg>Métronome<small>Tempo · Mesure · Tap</small></button>
+    <button class="isle t" data-go="accordeur"><svg viewBox="0 0 24 24"><path d="M3.5 17a8.5 8.5 0 0 1 17 0"/><path d="M12 17 16.5 9"/><circle cx="12" cy="17" r="1.2"/><path d="M12 8.5V7M6.8 10.3l-.9-.9M17.2 10.3l.9-.9"/></svg><span data-i18n="nav.tuner"></span><small data-i18n="tile.tuner.sub"></small></button>
+    <button class="isle m" data-go="metronome"><svg viewBox="0 0 24 24"><path d="M8.5 3h7l3.5 17.5H5z"/><path d="M12 16.5 15.5 7"/><path d="M13.3 10.5h3.2"/></svg><span data-i18n="nav.metro"></span><small data-i18n="tile.metro.sub"></small></button>
   </div>
 </section>
 
@@ -116,40 +134,63 @@ nav button.on{background:var(--card);color:var(--ok)}
   <div id="bpm">100</div>
   <div id="tname"></div>
   <div class="bpmrow"><button id="bm" aria-label="Moins">−</button><input id="bslide" type="range" min="30" max="250" step="1"><button id="bp" aria-label="Plus">+</button></div>
-  <div class="opts"><button id="tap">👆 Tap tempo</button></div>
-  <div class="lbl">Mesure</div>
+  <div class="opts"><button id="tap" data-i18n="metro.tap"></button></div>
+  <div class="lbl" data-i18n="metro.sig"></div>
   <div class="chips" id="tsig"></div>
-  <div class="lbl">Subdivision</div>
+  <div class="lbl" data-i18n="metro.sub"></div>
   <div class="chips" id="subs"></div>
   <div class="dots" id="dots"></div>
-  <div class="bpmrow" style="gap:10px"><span>🔈</span><input id="vol" type="range" min="0" max="100" step="1" aria-label="Volume du clic"><span>🔊</span></div>
+  <div class="bpmrow" style="gap:10px"><span>🔈</span><input id="vol" type="range" min="0" max="100" step="1" data-i18n-aria="metro.vol"><span>🔊</span></div>
   <div class="opts"><button id="oflash">Flash écran</button><button id="osound">Son</button></div>
-  <button id="mgo">Démarrer</button>
+  <button id="mgo"></button>
 </section>
+<section class="view" id="v-reglages">
+  <h2 data-i18n="set.title"></h2>
+  <div class="lbl" data-i18n="set.lang"></div>
+  <div class="chips" id="p-lang"></div>
+  <div class="lbl" data-i18n="set.instr"></div>
+  <div class="chips" id="p-instr"></div>
+  <p data-i18n="storage"></p>
+  <h2 data-i18n="set.help"></h2>
+  <p data-i18n="help.1"></p><p data-i18n="help.2"></p><p data-i18n="help.3"></p><p data-i18n="help.4"></p>
+  <h2 data-i18n="set.about"></h2>
+  <p><span data-i18n="set.version"></span> <b id="p-ver"></b></p>
+  <div class="lbl" data-i18n="set.notes"></div>
+  <div id="p-notes"></div>
+</section>
+<div id="modal"><div class="box"><h3 id="m-title"></h3><ul id="m-list"></ul><button id="m-ok"></button></div></div>
 <div id="flash"></div>
 <div id="ptr"><svg viewBox="0 0 24 24"><path d="M20.23 10.33 L22.91 10.57 L22.91 13.43 L20.23 13.67 L19.00 16.64 L20.72 18.70 L18.70 20.72 L16.64 19.00 L13.67 20.23 L13.43 22.91 L10.57 22.91 L10.33 20.23 L7.36 19.00 L5.30 20.72 L3.28 18.70 L5.00 16.64 L3.77 13.67 L1.09 13.43 L1.09 10.57 L3.77 10.33 L5.00 7.36 L3.28 5.30 L5.30 3.28 L7.36 5.00 L10.33 3.77 L10.57 1.09 L13.43 1.09 L13.67 3.77 L16.64 5.00 L18.70 3.28 L20.72 5.30 L19.00 7.36Z"/><circle cx="12" cy="12" r="3.4"/></svg></div>
 
 <section class="view" id="v-accordeur">
 <header>
-  <h1>Accordeur</h1>
+  <h1 data-i18n="nav.tuner"></h1>
   <div class="ref"><button id="m">−</button><span id="a4">A4 = 440 Hz</span><button id="p">+</button></div>
 </header>
 <main>
-  <div class="modes"><button data-mode="alto">Alto</button><button data-mode="violon">Violon</button><button data-mode="chro">Chromatique</button><button data-mode="guit">Guitare</button></div>
+  <div class="modes"><button data-mode="alto" data-i18n="mode.alto"></button><button data-mode="violon" data-i18n="mode.violon"></button><button data-mode="chro" data-i18n="mode.chro"></button><button data-mode="guit" data-i18n="mode.guit"></button></div>
   <div id="note">–</div>
   <div id="freq"></div>
-  <div class="meter"><svg id="gauge" viewBox="0 0 300 165" width="100%"><path d="M41.2 99.3A120 120 0 0 1 99.8 41.0" stroke="#ff5d5d55" stroke-width="16" fill="none"/><path d="M99.8 41.0A120 120 0 0 1 125.0 32.6" stroke="#ffb02077" stroke-width="16" fill="none"/><path d="M125.0 32.6A120 120 0 0 1 175.0 32.6" stroke="#2ee59d" stroke-width="16" fill="none"/><path d="M175.0 32.6A120 120 0 0 1 200.2 41.0" stroke="#ffb02077" stroke-width="16" fill="none"/><path d="M200.2 41.0A120 120 0 0 1 258.8 99.3" stroke="#ff5d5d55" stroke-width="16" fill="none"/><line x1="150.0" y1="41.0" x2="150.0" y2="62.0" stroke="#e8eef5" stroke-width="2.5"/><line x1="248.8" y1="103.9" x2="232.3" y2="111.6" stroke="#7d8a99" stroke-width="2.5"/><line x1="51.2" y1="103.9" x2="67.7" y2="111.6" stroke="#7d8a99" stroke-width="2.5"/><line x1="195.6" y1="51.0" x2="188.6" y2="66.3" stroke="#7d8a99" stroke-width="2.5"/><line x1="104.4" y1="51.0" x2="111.4" y2="66.3" stroke="#7d8a99" stroke-width="2.5"/><line x1="216.4" y1="63.5" x2="207.8" y2="74.6" stroke="#7d8a99" stroke-width="1.5"/><line x1="83.6" y1="63.5" x2="92.2" y2="74.6" stroke="#7d8a99" stroke-width="1.5"/><line x1="230.8" y1="76.8" x2="218.3" y2="88.1" stroke="#7d8a99" stroke-width="2.5"/><line x1="69.2" y1="76.8" x2="81.7" y2="88.1" stroke="#7d8a99" stroke-width="2.5"/><line x1="180.6" y1="45.4" x2="176.7" y2="58.8" stroke="#7d8a99" stroke-width="1.5"/><line x1="119.4" y1="45.4" x2="123.3" y2="58.8" stroke="#7d8a99" stroke-width="1.5"/><line x1="161.8" y1="41.6" x2="160.7" y2="51.4" stroke="#7d8a99" stroke-width="1.5"/><line x1="138.2" y1="41.6" x2="139.3" y2="51.4" stroke="#7d8a99" stroke-width="1.5"/><line x1="167.8" y1="42.5" x2="166.2" y2="52.1" stroke="#7d8a99" stroke-width="1.5"/><line x1="132.2" y1="42.5" x2="133.8" y2="52.1" stroke="#7d8a99" stroke-width="1.5"/><line x1="172.7" y1="43.4" x2="170.7" y2="53.0" stroke="#7d8a99" stroke-width="1.5"/><line x1="127.3" y1="43.4" x2="129.3" y2="53.0" stroke="#7d8a99" stroke-width="1.5"/><line x1="176.9" y1="44.4" x2="174.5" y2="53.9" stroke="#7d8a99" stroke-width="1.5"/><line x1="123.1" y1="44.4" x2="125.5" y2="53.9" stroke="#7d8a99" stroke-width="1.5"/><line x1="188.7" y1="48.1" x2="185.3" y2="57.3" stroke="#7d8a99" stroke-width="1.5"/><line x1="111.3" y1="48.1" x2="114.7" y2="57.3" stroke="#7d8a99" stroke-width="1.5"/><line x1="207.1" y1="57.1" x2="201.9" y2="65.5" stroke="#7d8a99" stroke-width="1.5"/><line x1="92.9" y1="57.1" x2="98.1" y2="65.5" stroke="#7d8a99" stroke-width="1.5"/><line x1="241.3" y1="90.4" x2="233.1" y2="95.8" stroke="#7d8a99" stroke-width="1.5"/><line x1="58.7" y1="90.4" x2="66.9" y2="95.8" stroke="#7d8a99" stroke-width="1.5"/><text x="182.7" y="82.2" fill="#7d8a99" font-size="9" text-anchor="middle">10</text><text x="117.3" y="82.2" fill="#7d8a99" font-size="9" text-anchor="middle">10</text><text x="207.8" y="100.6" fill="#7d8a99" font-size="9" text-anchor="middle">30</text><text x="92.2" y="100.6" fill="#7d8a99" font-size="9" text-anchor="middle">30</text><text x="32" y="40" fill="#ff8a8a" font-size="26" font-weight="700" text-anchor="middle">♭</text><text x="268" y="40" fill="#ff8a8a" font-size="26" font-weight="700" text-anchor="middle">♯</text><text x="32" y="62" fill="#7d8a99" font-size="11" text-anchor="middle">trop bas</text><text x="268" y="62" fill="#7d8a99" font-size="11" text-anchor="middle">trop haut</text><g id="needle" style="transform-origin:150px 150px"><line x1="150" y1="150" x2="150" y2="46" stroke="#7d8a99" stroke-width="4" stroke-linecap="round"/></g><circle cx="150" cy="150" r="9" fill="#e8eef5"/></svg></div>
+  <div class="meter"><svg id="gauge" viewBox="0 0 300 165" width="100%"><path d="M41.2 99.3A120 120 0 0 1 99.8 41.0" stroke="#ff5d5d55" stroke-width="16" fill="none"/><path d="M99.8 41.0A120 120 0 0 1 125.0 32.6" stroke="#ffb02077" stroke-width="16" fill="none"/><path d="M125.0 32.6A120 120 0 0 1 175.0 32.6" stroke="#2ee59d" stroke-width="16" fill="none"/><path d="M175.0 32.6A120 120 0 0 1 200.2 41.0" stroke="#ffb02077" stroke-width="16" fill="none"/><path d="M200.2 41.0A120 120 0 0 1 258.8 99.3" stroke="#ff5d5d55" stroke-width="16" fill="none"/><line x1="150.0" y1="41.0" x2="150.0" y2="62.0" stroke="#e8eef5" stroke-width="2.5"/><line x1="248.8" y1="103.9" x2="232.3" y2="111.6" stroke="#7d8a99" stroke-width="2.5"/><line x1="51.2" y1="103.9" x2="67.7" y2="111.6" stroke="#7d8a99" stroke-width="2.5"/><line x1="195.6" y1="51.0" x2="188.6" y2="66.3" stroke="#7d8a99" stroke-width="2.5"/><line x1="104.4" y1="51.0" x2="111.4" y2="66.3" stroke="#7d8a99" stroke-width="2.5"/><line x1="216.4" y1="63.5" x2="207.8" y2="74.6" stroke="#7d8a99" stroke-width="1.5"/><line x1="83.6" y1="63.5" x2="92.2" y2="74.6" stroke="#7d8a99" stroke-width="1.5"/><line x1="230.8" y1="76.8" x2="218.3" y2="88.1" stroke="#7d8a99" stroke-width="2.5"/><line x1="69.2" y1="76.8" x2="81.7" y2="88.1" stroke="#7d8a99" stroke-width="2.5"/><line x1="180.6" y1="45.4" x2="176.7" y2="58.8" stroke="#7d8a99" stroke-width="1.5"/><line x1="119.4" y1="45.4" x2="123.3" y2="58.8" stroke="#7d8a99" stroke-width="1.5"/><line x1="161.8" y1="41.6" x2="160.7" y2="51.4" stroke="#7d8a99" stroke-width="1.5"/><line x1="138.2" y1="41.6" x2="139.3" y2="51.4" stroke="#7d8a99" stroke-width="1.5"/><line x1="167.8" y1="42.5" x2="166.2" y2="52.1" stroke="#7d8a99" stroke-width="1.5"/><line x1="132.2" y1="42.5" x2="133.8" y2="52.1" stroke="#7d8a99" stroke-width="1.5"/><line x1="172.7" y1="43.4" x2="170.7" y2="53.0" stroke="#7d8a99" stroke-width="1.5"/><line x1="127.3" y1="43.4" x2="129.3" y2="53.0" stroke="#7d8a99" stroke-width="1.5"/><line x1="176.9" y1="44.4" x2="174.5" y2="53.9" stroke="#7d8a99" stroke-width="1.5"/><line x1="123.1" y1="44.4" x2="125.5" y2="53.9" stroke="#7d8a99" stroke-width="1.5"/><line x1="188.7" y1="48.1" x2="185.3" y2="57.3" stroke="#7d8a99" stroke-width="1.5"/><line x1="111.3" y1="48.1" x2="114.7" y2="57.3" stroke="#7d8a99" stroke-width="1.5"/><line x1="207.1" y1="57.1" x2="201.9" y2="65.5" stroke="#7d8a99" stroke-width="1.5"/><line x1="92.9" y1="57.1" x2="98.1" y2="65.5" stroke="#7d8a99" stroke-width="1.5"/><line x1="241.3" y1="90.4" x2="233.1" y2="95.8" stroke="#7d8a99" stroke-width="1.5"/><line x1="58.7" y1="90.4" x2="66.9" y2="95.8" stroke="#7d8a99" stroke-width="1.5"/><text x="182.7" y="82.2" fill="#7d8a99" font-size="9" text-anchor="middle">10</text><text x="117.3" y="82.2" fill="#7d8a99" font-size="9" text-anchor="middle">10</text><text x="207.8" y="100.6" fill="#7d8a99" font-size="9" text-anchor="middle">30</text><text x="92.2" y="100.6" fill="#7d8a99" font-size="9" text-anchor="middle">30</text><text x="32" y="40" fill="#ff8a8a" font-size="26" font-weight="700" text-anchor="middle">♭</text><text x="268" y="40" fill="#ff8a8a" font-size="26" font-weight="700" text-anchor="middle">♯</text><text x="32" y="62" fill="#7d8a99" font-size="11" text-anchor="middle" data-i18n="gauge.low"></text><text x="268" y="62" fill="#7d8a99" font-size="11" text-anchor="middle" data-i18n="gauge.high"></text><g id="needle" style="transform-origin:150px 150px"><line x1="150" y1="150" x2="150" y2="46" stroke="#7d8a99" stroke-width="4" stroke-linecap="round"/></g><circle cx="150" cy="150" r="9" fill="#e8eef5"/></svg></div>
   <div id="cents"></div>
   <div class="strings" id="strings"></div>
-  <button id="play" disabled>🔊 Jouer la note</button>
-  <button id="start">Démarrer</button>
+  <button id="play" disabled></button>
+  <button id="start" data-i18n="start"></button>
   <div id="level" style="width:100%;max-width:340px;height:4px;background:var(--card);border-radius:2px;overflow:hidden"><div id="lvl" style="height:100%;width:0;background:var(--ok);transition:width .1s"></div></div>
-  <div id="msg">Touchez « Démarrer » et autorisez le micro.</div>
+  <div id="msg"></div>
 </main>
 </section>
 <script src="version.js"></script>
+<script src="i18n.js"></script>
 <script src="pitch.js"></script>
 <script>
+// --- préférences (gardées sur l'appareil) et langue
+const PREFS = Object.assign({lang:'fr', instrument:'alto'}, (() => { try { return JSON.parse(localStorage.getItem('prefs')) || {}; } catch (e) { return {}; } })());
+const savePrefs = () => { try { localStorage.setItem('prefs', JSON.stringify(PREFS)); } catch (e) {} };
+if (!I18N[PREFS.lang]) PREFS.lang = 'fr';
+LANG = PREFS.lang; document.documentElement.lang = LANG;
+let curMsg = ['msg.idle'];
+function setMsg(k, a){ curMsg = [k, a]; $('msg').textContent = tr(k, a); }
 const NAMES = ['Do','Do♯','Ré','Ré♯','Mi','Fa','Fa♯','Sol','Sol♯','La','La♯','Si'];
 const TUNINGS = {
   guit: [['Mi',82.41,2],['La',110,2],['Ré',146.83,3],['Sol',196,3],['Si',246.94,3],['Mi',329.63,4]],
@@ -157,7 +198,7 @@ const TUNINGS = {
   violon: [['Sol',196,3],['Ré',293.66,4],['La',440,4],['Mi',659.26,5]]
 };
 const $ = id => document.getElementById(id);
-let a4 = +localStorage.getItem('a4') || 440, mode = localStorage.getItem('mode') || 'alto', target = null, near = null;
+let a4 = +localStorage.getItem('a4') || 440, mode = PREFS.instrument, target = null, near = null;
 if (!TUNINGS[mode] && mode !== 'chro') mode = 'alto';
 let wired = false, stream = null, loopOn = false, ctx, analyser, buf, smooth = null, lastHeard = 0, lastTarget = null, tone = null, lastDetect = 0;
 
@@ -168,24 +209,25 @@ $('m').onclick = () => setA4(a4-1); $('p').onclick = () => setA4(a4+1);
 function renderStrings(){
   const box = $('strings'); box.innerHTML = '';
   if (TUNINGS[mode]) {
-    const a = document.createElement('button'); a.textContent = 'Auto';
+    const a = document.createElement('button'); a.textContent = tr('auto');
     a.className = 'auto' + (target === null ? ' on' : '');
     a.onclick = () => { target = null; renderStrings(); updatePlay(); };
     box.appendChild(a);
   }
   (TUNINGS[mode] || []).forEach((s,i) => {
-    const b = document.createElement('button'); b.innerHTML = `${s[0]}<small style="color:var(--mut)">${s[2]}</small>`;
+    const b = document.createElement('button'); b.innerHTML = `${nn(s[0])}<small style="color:var(--mut)">${s[2]}</small>`;
     b.onclick = () => { target = target === i ? null : i; renderStrings(); updatePlay(); };
     if (target === i) b.className = 'on'; else if (target === null && near === i) b.className = 'near';
     box.appendChild(b);
   });
 }
 document.querySelectorAll('.modes button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
-document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
-  mode = b.dataset.mode; target = null; near = null; lastTarget = null; stopTone(); localStorage.setItem('mode', mode);
-  document.querySelectorAll('.modes button').forEach(x => x.classList.toggle('on', x === b));
+function setMode(m){
+  mode = m; target = null; near = null; lastTarget = null; stopTone();
+  document.querySelectorAll('.modes button').forEach(x => x.classList.toggle('on', x.dataset.mode === mode));
   renderStrings(); updatePlay();
-});
+}
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => setMode(b.dataset.mode));
 
 function analyse(f, idx){
   const scale = a4/440;
@@ -212,13 +254,13 @@ let hist = [], histLabel = null, fc = 0, needleAng = 0, needleTgt = 0, active = 
 function show(r, f){
   lastTarget = r; updatePlay();
   const a = Math.abs(r.cents), col = colFor(a);
-  $('note').innerHTML = r.label + (r.oct !== '' ? `<small>${r.oct}</small>` : '');
+  $('note').innerHTML = nn(r.label) + (r.oct !== '' ? `<small>${r.oct}</small>` : '');
   $('note').style.color = col;
   needleTgt = ang(r.cents); active = true;
   $('needle').firstChild.style.stroke = col;
-  $('freq').textContent = f.toFixed(2) + ' Hz  (cible ' + r.hz.toFixed(2) + ')';
-  $('cents').textContent = a < 3 ? 'Juste ✓  ' + (r.cents > 0 ? '+' : '') + r.cents.toFixed(1) + ' ¢'
-    : (r.cents > 0 ? '▼ Trop haut  +' : '▲ Trop bas  −') + a.toFixed(1) + ' ¢';
+  $('freq').textContent = f.toFixed(2) + ' Hz  (' + tr('target') + ' ' + r.hz.toFixed(2) + ')';
+  $('cents').textContent = a < 3 ? tr('cents.ok') + '  ' + (r.cents > 0 ? '+' : '') + r.cents.toFixed(1) + ' ¢'
+    : (r.cents > 0 ? tr('cents.high') + '  +' : tr('cents.low') + '  −') + a.toFixed(1) + ' ¢';
   $('cents').style.color = col;
 }
 function idle(){
@@ -254,13 +296,13 @@ function loop(){
   const now = performance.now();
   if (now - lastDetect < 50) return;
   lastDetect = now;
-  if (ctx.state !== 'running') { ctx.resume().catch(() => {}); $('msg').textContent = 'Micro en pause… touchez l’écran.'; return; }
+  if (ctx.state !== 'running') { ctx.resume().catch(() => {}); setMsg('msg.paused'); return; }
   analyser.getFloatTimeDomainData(buf);
   const res = detect();
   $('lvl').style.width = Math.min(100, Math.sqrt(res.rms || 0) * 220) + '%';
   if (res.freq > 0) {
     lastHeard = now;
-    $('msg').textContent = 'Écoute en cours…';
+    setMsg('msg.listening');
     const r = analyse(res.freq, res.idx);
     if (res.idx !== undefined && target === null && near !== res.idx) { near = res.idx; renderStrings(); }
     const key = r.label + r.oct;
@@ -285,7 +327,7 @@ function updatePlay(){
   const t = curTarget(), b = $('play');
   b.disabled = !t && !tone;
   b.classList.toggle('on', !!tone);
-  b.textContent = tone ? '■ Stop' : t ? `🔊 Jouer ${t.label}${t.oct}` : '🔊 Jouer la note';
+  b.textContent = tone ? tr('stopTone') : t ? tr('play.x', nn(t.label) + t.oct) : tr('play.note');
 }
 function stopTone(){
   if (!tone) return;
@@ -309,7 +351,7 @@ $('play').onclick = async () => {
 };
 $('start').onclick = async () => {
   try {
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error('Micro indisponible (HTTPS requis).');
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error(tr('msg.nomic'));
     const reuse = stream && stream.getAudioTracks().some(t => t.readyState === 'live');
     if (reuse) stream.getTracks().forEach(t => { t.enabled = true; });
     else stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
@@ -323,13 +365,13 @@ $('start').onclick = async () => {
       ctx.onstatechange = () => { if (ctx.state !== 'running') ctx.resume().catch(() => {}); };
       document.addEventListener('visibilitychange', () => { if (!document.hidden) ctx.resume().catch(() => {}); });
       document.addEventListener('touchstart', () => { if (ctx.state !== 'running') ctx.resume().catch(() => {}); }, {passive:true});
-      stream.getAudioTracks()[0].onended = () => { $('msg').textContent = 'Micro coupé. Rechargez la page.'; };
+      stream.getAudioTracks()[0].onended = () => { setMsg('msg.cut'); };
     }
-    $('start').style.display = 'none'; $('msg').textContent = 'Jouez une note…';
+    $('start').style.display = 'none'; setMsg('msg.play');
     navigator.wakeLock?.request('screen').catch(()=>{});
     if (!loopOn) { loopOn = true; loop(); }
   } catch (e) {
-    $('msg').textContent = 'Erreur : ' + (e.message || e.name) + ' — vérifiez l’autorisation du micro dans Réglages > Safari.';
+    setMsg('msg.err', e.message || e.name);
   }
 };
 renderStrings(); updatePlay();
@@ -355,12 +397,13 @@ function renderChips(){
   const mk = (box, items, cur, fn) => { box.innerHTML=''; items.forEach(([label, val]) => {
     const b = document.createElement('button'); b.textContent = label; if (val === cur) b.className = 'on';
     b.onclick = () => { fn(val); renderChips(); }; box.appendChild(b); }); };
-  mk($('tsig'), Object.keys(SIGS).map(k => [k, k]), M.sig, v => { M.sig = v; mBeat = 0; mSub = 0; saveM(); });
-  mk($('subs'), SUBS, M.sub, v => { M.sub = v; mSub = 0; saveM(); });
+  mk($('tsig'), Object.keys(SIGS).map(k => [k === 'Libre' ? tr('metro.free') : k, k]), M.sig, v => { M.sig = v; mBeat = 0; mSub = 0; saveM(); });
+  mk($('subs'), SUBS.map(([, v]) => [tr('sub.' + v), v]), M.sub, v => { M.sub = v; mSub = 0; saveM(); });
   const d = $('dots'); d.innerHTML = '';
   for (let i = 0; i < SIGS[M.sig].n; i++) { const e = document.createElement('div'); e.className = 'dot' + (SIGS[M.sig].acc.includes(i) ? ' acc' : ''); d.appendChild(e); }
   $('oflash').classList.toggle('on', M.flash); $('osound').classList.toggle('on', M.sound);
-  $('osound').textContent = M.sound ? '🔊 Son' : '🔇 Muet';
+  $('osound').textContent = M.sound ? tr('metro.sound') : tr('metro.mute'); $('oflash').textContent = tr('metro.flash');
+  $('mgo').textContent = mRun ? tr('stop') : tr('start');
 }
 function click(time, kind){            // kind: 2 accent fort, 1 temps, 0 subdivision
   if (!M.sound) return;
@@ -396,14 +439,14 @@ async function startMetro(){
   await ctx.resume();
   mRun = true; mBeat = 0; mSub = 0; mQueue = []; mNext = ctx.currentTime + 0.08;
   mTimer = setInterval(mSchedule, 25); mSchedule(); mDraw();
-  $('mgo').textContent = 'Stop'; $('mgo').classList.add('on');
+  $('mgo').textContent = tr('stop'); $('mgo').classList.add('on');
   navigator.wakeLock?.request('screen').then(w => { mWake = w; }).catch(() => {});
 }
 function stopMetro(){
   if (!mRun) return;
   mRun = false; clearInterval(mTimer); cancelAnimationFrame(mRaf); mQueue = [];
   [...$('dots').children].forEach(d => d.classList.remove('lit'));
-  $('mgo').textContent = 'Démarrer'; $('mgo').classList.remove('on');
+  $('mgo').textContent = tr('start'); $('mgo').classList.remove('on');
   try { mWake && mWake.release(); } catch (e) {} mWake = null;
 }
 $('mgo').onclick = () => mRun ? stopMetro() : startMetro();
@@ -476,10 +519,10 @@ function stopMic(){
   // on garde le flux (désactivé) pour ne pas redemander l'autorisation à chaque retour sur l'accordeur
   if (stream) stream.getTracks().forEach(t => { t.enabled = false; });
   analyser = null; idle();
-  $('start').style.display = ''; $('msg').textContent = 'Touchez « Démarrer » et autorisez le micro.'; $('lvl').style.width = '0';
+  $('start').style.display = ''; setMsg('msg.idle'); $('lvl').style.width = '0';
 }
 function route(){
-  const page = ['accueil','accordeur','metronome'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'accueil';
+  const page = ['accueil','accordeur','metronome','reglages'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'accueil';
   if (page !== 'accordeur' && analyser) stopMic();
   if (page !== 'metronome') stopMetro();
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'v-' + page));
@@ -489,7 +532,47 @@ function route(){
 document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { location.hash = b.dataset.go; });
 window.addEventListener('hashchange', route);
 route();
-$('ver').textContent = 'v' + APP_VERSION;
+$('ver').textContent = 'v' + APP_VERSION; $('ver').onclick = () => { location.hash = 'reglages'; };
+
+// --- langue, réglages, notes de version
+function applyLang(){
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-i18n]').forEach(e => { e.textContent = tr(e.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-aria]').forEach(e => e.setAttribute('aria-label', tr(e.dataset.i18nAria)));
+  renderStrings(); updatePlay(); renderChips(); setMsg(...curMsg); renderSettings();
+}
+function renderSettings(){
+  const mk = (box, items, cur, fn) => { box.innerHTML = ''; items.forEach(([label, val]) => {
+    const b = document.createElement('button'); b.textContent = label; if (val === cur) b.className = 'on';
+    b.onclick = () => { fn(val); renderSettings(); }; box.appendChild(b); }); };
+  mk($('p-lang'), [['Français','fr'],['English','en']], LANG, v => { PREFS.lang = LANG = v; savePrefs(); applyLang(); });
+  mk($('p-instr'), ['alto','violon','guit','chro'].map(k => [tr('mode.' + k), k]), PREFS.instrument, v => { PREFS.instrument = v; savePrefs(); setMode(v); });
+  $('p-ver').textContent = APP_VERSION;
+  const box = $('p-notes'); box.innerHTML = '';
+  if (!RELEASES) { box.textContent = tr('notes.none'); return; }
+  RELEASES.forEach((rel, i) => {
+    const d = document.createElement('details'); d.className = 'rel'; d.open = i === 0;
+    d.innerHTML = `<summary>v${rel.version}<small>${rel.date}</small></summary><ul>${(rel[LANG] || rel.fr).map(x => '<li></li>').join('')}</ul>`;
+    d.querySelectorAll('li').forEach((li, j) => { li.textContent = (rel[LANG] || rel.fr)[j]; });
+    box.appendChild(d);
+  });
+}
+let RELEASES = null;
+function showWhatsNew(){
+  const rel = RELEASES && RELEASES.find(x => x.version === APP_VERSION); if (!rel) return;
+  $('m-title').textContent = tr('whatsnew') + ' · v' + rel.version; $('m-ok').textContent = tr('ok');
+  $('m-list').innerHTML = ''; (rel[LANG] || rel.fr).forEach(x => { const li = document.createElement('li'); li.textContent = x; $('m-list').appendChild(li); });
+  $('modal').classList.add('on');
+}
+$('m-ok').onclick = () => $('modal').classList.remove('on');
+fetch('releases.json', {cache: 'no-cache'}).then(r => r.json()).then(j => {
+  RELEASES = j; renderSettings();
+  // nouvelle version depuis la dernière ouverture : on affiche les nouveautés (rien à la toute première ouverture)
+  let seen = null; try { seen = localStorage.getItem('seenVersion'); } catch (e) {}
+  if (seen && seen !== APP_VERSION) showWhatsNew();
+  try { localStorage.setItem('seenVersion', APP_VERSION); } catch (e) {}
+}).catch(() => {});
+applyLang();
 // Mise à jour automatique : le service worker est vérifié à chaque ouverture ; si une nouvelle version
 // prend le relais, la page se recharge une fois toute seule.
 if ('serviceWorker' in navigator) {

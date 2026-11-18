@@ -37,4 +37,14 @@ for (const sr of [44100, 48000]) for (const [inst, hzs] of Object.entries(SETS))
   });
 }
 console.log(`détection ciblée: ${tot - bad2}/${tot} OK`);
-process.exit(bad || bad2 ? 1 : 0);
+// --- cohérence version / notes de version / traductions
+const fs = require('fs');
+const ver = /APP_VERSION = '([^']+)'/.exec(fs.readFileSync('./version.js', 'utf8'))[1];
+const rel = JSON.parse(fs.readFileSync('./releases.json', 'utf8'));
+let bad3 = 0;
+if (rel[0].version !== ver) { bad3++; console.log('ÉCHEC: releases.json[0] =', rel[0].version, 'mais APP_VERSION =', ver); }
+rel.forEach(x => { if (!x.fr?.length || !x.en?.length) { bad3++; console.log('ÉCHEC: notes fr/en manquantes pour', x.version); } });
+const { I18N } = require('./i18n.js');
+Object.keys(I18N.fr).filter(k => !(k in I18N.en)).forEach(k => { bad3++; console.log('ÉCHEC: clé anglaise manquante', k); });
+console.log(`version ${ver}, ${rel.length} entrées de notes, traductions ${bad3 ? 'KO' : 'OK'}`);
+process.exit(bad || bad2 || bad3 ? 1 : 0);

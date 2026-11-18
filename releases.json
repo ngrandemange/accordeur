@@ -1,0 +1,23 @@
+[
+  {"version":"1.5.0","date":"2026-11-18",
+   "fr":["Page Réglages : langue (français / anglais) et instrument par défaut, gardés sur l'appareil","Aide et notes de version dans « Réglages »","Fenêtre « Nouveautés » après chaque mise à jour"],
+   "en":["Settings page: language (French / English) and default instrument, kept on the device","Help and release notes in “Settings”","“What’s new” window after each update"]},
+  {"version":"1.4.1","date":"2026-11-18",
+   "fr":["Accueil : le menu du haut ne garde que la version"],
+   "en":["Home: the top menu now only shows the version"]},
+  {"version":"1.4.0","date":"2026-11-18",
+   "fr":["Tirer la page vers le bas pour rafraîchir, avec un engrenage animé"],
+   "en":["Pull down to refresh, with an animated gear"]},
+  {"version":"1.3.0","date":"2026-11-18",
+   "fr":["Métronome : réglage du volume du clic"],
+   "en":["Metronome: click volume control"]},
+  {"version":"1.2.0","date":"2026-11-18",
+   "fr":["Métronome : tempo 30–250, mesures 2/4 3/4 4/4 6/8, subdivisions, tap tempo, flash écran, mode muet"],
+   "en":["Metronome: tempo 30–250, 2/4 3/4 4/4 6/8, subdivisions, tap tempo, screen flash, mute mode"]},
+  {"version":"1.1.0","date":"2026-11-18",
+   "fr":["Version affichée en haut à droite","Mise à jour automatique au démarrage","Le micro n'est plus redemandé en changeant de page"],
+   "en":["Version shown at the top right","Automatic update on startup","The microphone is no longer requested again when changing page"]},
+  {"version":"1.0.0","date":"2026-11-18",
+   "fr":["Accordeur alto (par défaut), violon, guitare et chromatique","Détection ciblée par corde, jauge précise, lecture de la note de référence","Accueil en îles et menu du haut"],
+   "en":["Viola (default), violin, guitar and chromatic tuner","Per-string detection, precise gauge, reference note playback","Island-style home and top menu"]}
+]
