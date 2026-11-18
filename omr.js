@@ -534,16 +534,18 @@ const OMR = (() => {
     }
     out.comps.push(...comps.map(c => ({ staff: si, x: c.cx, y: c.cy, w: c.w, h: c.h, score: c.score, guess: c.guess, cls: c.type, type: c.used || c.type || (headComp.has(c.id) ? 'head' : null) })));
   }
-  function analyzeStraight(g, w, h, dbg, TPL) {
+  function analyzeStraight(g, w, h, dbg, TPL, onProgress) {
+    const P = (p, label) => { if (onProgress) onProgress(p, label); };
+    P(0.02, 'binarize');
     const B = binarize(g, w, h), box = paperBox(g, w, h); maskOutside(B, w, h, box);
     const staves = findStaves(B, w, h);
     if (!staves.length) return { staves: [], heads: [], rests: [], comps: [], box };
-    const dm = staves[0].d;
+    const dm = staves[0].d; P(0.1, 'staves');
     despeckle(B, w, h, Math.max(3, Math.round(0.03 * dm * dm)));            // nettoyage : taches de bruit
     const B2 = removeLines(B, w, h, staves); despeckle(B2, w, h, Math.max(3, Math.round(0.04 * dm * dm)));
     const heads = [], lab = new Int32Array(w * h), out = { rests: [], comps: [], nextId: 0 };
     if (dbg && dbg.collect) out.raw = [];
-    const B3 = repairLines(B, B2, w, h, staves);
+    const B3 = repairLines(B, B2, w, h, staves); P(0.2, 'symbols');
     staves.forEach((s, si) => {
       let comps = readHeader(B3, w, h, s, lab, TPL, out); const d = s.d;
       comps = eraseAnnotations([B, B2, B3], lab, comps, w, h, s, B);
@@ -580,6 +582,7 @@ const OMR = (() => {
       for (let k = hs.length - 1; k >= 0; k--) if (!ledgerOK(B, w, h, s, hs[k])) hs.splice(k, 1);
       attachSymbols(B, B2, w, h, s, si, hs, comps, headComp, out, B3, lab, TPL);
       heads.push(...hs);
+      P(0.2 + 0.78 * (si + 1) / staves.length, 'staff');
     });
     // une tête n'appartient qu'à la portée la plus proche (les zones de recherche de portées voisines se recouvrent)
     const mid = staves.map(s => s.lines[2]);

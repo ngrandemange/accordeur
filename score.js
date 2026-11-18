@@ -11,11 +11,19 @@
 
   // ---------- calculs lourds dans un Worker (repli : fil principal) ----------
   let worker = null, wid = 0; const pend = {};
-  try { worker = new Worker('omr-worker.js'); worker.onmessage = e => { const p = pend[e.data.id]; if (p) { delete pend[e.data.id]; e.data.error ? p.ko(new Error(e.data.error)) : p.ok(e.data); } }; worker.onerror = () => { worker = null; }; } catch (e) { worker = null; }
-  const call = (type, g, w, h) => new Promise((ok, ko) => {
-    if (worker) { const id = ++wid; pend[id] = { ok, ko }; worker.postMessage({ type, g, w, h, id }, [g.buffer]); return; }
-    setTimeout(() => { try { if (type === 'angle') ok({ angle: OMR.analyzeGray(g, w, h).angle }); else { const r = OMR.analyzeStraight(g, w, h); ok({ res: { staves: r.staves, box: r.box, heads: r.heads } }); } } catch (e) { ko(e); } }, 20);
+  try { worker = new Worker('omr-worker.js'); worker.onmessage = e => { const p = pend[e.data.id]; if (!p) return; if (e.data.progress !== undefined) { if (p.onp) p.onp(e.data.progress); return; } delete pend[e.data.id]; e.data.error ? p.ko(new Error(e.data.error)) : p.ok(e.data); }; worker.onerror = () => { worker = null; }; } catch (e) { worker = null; }
+  const pack = r => ({ staves: r.staves, box: r.box, clef: r.clef, key: r.key, rests: r.rests, heads: r.heads.map(x => ({ x: x.x, y: x.y, staff: x.staff, hollow: x.hollow, flags: x.flags, dots: x.dots, acc: x.acc, stem: x.stem ? { dir: x.stem.dir, len: x.stem.len } : null })) });
+  const call = (type, g, w, h, onp) => new Promise((ok, ko) => {
+    if (worker) { const id = ++wid; pend[id] = { ok, ko, onp }; worker.postMessage({ type, g, w, h, id }, [g.buffer]); return; }
+    setTimeout(() => { try { if (type === 'angle') ok({ angle: OMR.analyzeGray(g, w, h).angle }); else ok({ res: pack(OMR.analyzeStraight(g, w, h, null, OMR_TEMPLATES)) }); } catch (e) { ko(e); } }, 20);
   });
+  // barre de progression (0..1) : ne recule jamais pendant une analyse
+  const prog = (p, key) => { S.progress = Math.max(S.progress || 0, Math.min(1, p)); if (key) S.step = key; showProg(); };
+  function showProg() {
+    const pct = Math.round((S.progress || 0) * 100);
+    $('sc-bar').style.width = pct + '%'; $('sc-pct').textContent = pct + ' %'; $('sc-step').textContent = tr(S.step || 'score.busy');
+    $('sc-bar').parentElement.setAttribute('aria-valuenow', pct);
+  }
 
   // ---------- image ----------
   async function loadBitmap(blob) {
@@ -38,18 +46,20 @@
 
   async function analyze(blob) {
     for (const q of [0, 1, 3, 2]) {                       // si aucune portée : photo prise de travers, on essaie les quarts de tour
+      prog(0.06 + q * 0.01, 'score.step.angle');
       const c0 = await renderBase(blob, q, 0);
       const { angle } = await call('angle', grayOf(c0), c0.width, c0.height);
+      prog(0.2, 'score.step.read');
       const c1 = await renderBase(blob, q, angle);
-      const { res } = await call('analyze', grayOf(c1), c1.width, c1.height);
+      const { res } = await call('analyze', grayOf(c1), c1.width, c1.height, p => prog(0.2 + 0.4 * p, 'score.step.read'));
       if (res.staves.length) {
         S.quarter = q; S.angle = angle; S.res = res; S.base = c1; S.scale = 1;
         const d = res.staves[0].d;
         if (d < 12) {                                   // portées trop petites (photo basse résolution) : on agrandit puis on relit
           const f = Math.min(14 / d, 3600 / Math.max(c1.width, c1.height));
-          if (f > 1.25) { const c2 = await renderBase(blob, q, angle, f), r2 = await call('analyze', grayOf(c2), c2.width, c2.height); if (r2.res.staves.length) { S.res = r2.res; S.base = c2; S.scale = f; } }
+          if (f > 1.25) { prog(0.62, 'score.step.zoom'); const c2 = await renderBase(blob, q, angle, f), r2 = await call('analyze', grayOf(c2), c2.width, c2.height, p => prog(0.62 + 0.36 * p, 'score.step.zoom')); if (r2.res.staves.length) { S.res = r2.res; S.base = c2; S.scale = f; } }
         }
-        S.clef = S.res.clef || defClef(); S.key = S.res.key || 0;
+        S.clef = S.res.clef || defClef(); S.key = S.res.key || 0; prog(1, 'score.step.done');
         return true;
       }
     }
@@ -119,7 +129,7 @@
     $('sc-wrap').style.display = has ? '' : 'none';
     $('sc-del').style.display = S.blob ? '' : 'none';
     $('sc-pick').firstElementChild.textContent = tr(S.blob ? 'score.again' : 'score.photo');
-    $('sc-busy').style.display = S.busy ? 'block' : 'none'; $('sc-busy').textContent = tr('score.busy');
+    $('sc-busy').style.display = S.busy ? 'block' : 'none'; if (S.busy) showProg();
     $('sc-info').textContent = S.busy ? '' : !S.blob ? tr('score.empty') : has ? tr('score.found', S.res.staves.length, S.notes.filter(n => !n.rest).length) + ' ' + tr('score.detected', tr('score.clef.' + (S.res.clef || S.clef)), S.key === 0 ? '♮' : S.key > 0 ? S.key + '♯' : -S.key + '♭', S.notes.filter(n => n.rest).length) : tr('score.none');
     if (!has) return;
     chips($('sc-clef'), [['alto', 'alto'], ['treble', 'treble'], ['bass', 'bass']].map(([k, v]) => [tr('score.clef.' + k), v]), S.clef, v => { S.clef = v; refresh(); });
@@ -203,9 +213,9 @@
 
   // ---------- événements ----------
   async function setPhoto(file) {
-    stopPlay(); S.busy = true; S.blob = null; S.res = null; S.edits = {}; S.sel = -1; S.notes = []; closeSheet(); render();
+    stopPlay(); S.busy = true; S.progress = 0; S.step = 'score.step.prep'; S.blob = null; S.res = null; S.edits = {}; S.sel = -1; S.notes = []; closeSheet(); render();
     try {
-      S.blob = await downscale(file); await kv('set', 'photo', S.blob);
+      S.progress = 0; prog(0.01, 'score.step.prep'); S.blob = await downscale(file); await kv('set', 'photo', S.blob); prog(0.05, 'score.step.prep');
       S.zoom = 0; S.clef = null; S.key = 0; S.keyManual = false; await analyze(S.blob); rebuildNotes(); await saveScan();
     } catch (e) { S.res = { staves: [], heads: [] }; }
     S.busy = false; render();

@@ -1,5 +1,15 @@
 [
  {
+  "version": "1.8.1",
+  "date": "2026-11-18",
+  "fr": [
+   "Partition : barre de progression pendant l'analyse de la photo, avec l'étape en cours"
+  ],
+  "en": [
+   "Score: progress bar with the current step while the photo is analysed"
+  ]
+ },
+ {
   "version": "1.8.0",
   "date": "2026-11-18",
   "fr": [
