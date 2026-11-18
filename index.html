@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Accordeur">
+<meta name="theme-color" content="#0b0f14">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<title>Accordeur</title>
+<style>
+:root{--bg:#0b0f14;--fg:#e8eef5;--mut:#7d8a99;--ok:#2ee59d;--warn:#ffb020;--bad:#ff5d5d;--card:#151b23}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:-apple-system,system-ui,sans-serif;overscroll-behavior:none}
+body{display:flex;flex-direction:column;align-items:center;padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom);user-select:none;-webkit-user-select:none}
+header{width:100%;max-width:460px;display:flex;justify-content:space-between;align-items:center;padding:12px 0}
+h1{font-size:18px;margin:0;font-weight:600}
+.ref{display:flex;align-items:center;gap:10px;color:var(--mut);font-size:14px}
+.ref button{width:34px;height:34px;border-radius:50%;border:0;background:var(--card);color:var(--fg);font-size:20px}
+main{flex:1;width:100%;max-width:460px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+#note{font-size:120px;font-weight:700;line-height:1;transition:color .15s}
+#note small{font-size:40px;font-weight:500;vertical-align:top}
+#freq{color:var(--mut);font-size:18px;font-variant-numeric:tabular-nums;min-height:24px}
+.meter{position:relative;width:100%;height:90px}
+.meter .tick{position:absolute;top:30px;width:2px;height:30px;background:#2a3441;left:50%}
+.meter .tick.c{background:var(--ok);height:50px;top:20px}
+#needle{position:absolute;top:10px;left:50%;width:6px;height:70px;margin-left:-3px;border-radius:3px;background:var(--mut);transition:left .08s linear,background .15s}
+#cents{font-size:22px;font-variant-numeric:tabular-nums;min-height:28px}
+.strings{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.strings button{min-width:52px;padding:10px 0;border-radius:10px;border:0;background:var(--card);color:var(--fg);font-size:16px}
+.strings button.on{outline:2px solid var(--ok)}
+#start{padding:16px 40px;font-size:20px;border:0;border-radius:14px;background:var(--ok);color:#04130c;font-weight:700}
+#msg{color:var(--mut);text-align:center;font-size:14px;min-height:20px}
+.modes{display:flex;gap:8px}
+.modes button{padding:8px 14px;border-radius:20px;border:0;background:var(--card);color:var(--mut)}
+.modes button.on{background:var(--fg);color:var(--bg)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Accordeur</h1>
+  <div class="ref"><button id="m">−</button><span id="a4">A4 = 440 Hz</span><button id="p">+</button></div>
+</header>
+<main>
+  <div class="modes"><button data-mode="chro" class="on">Chromatique</button><button data-mode="guit">Guitare</button><button data-mode="uke">Ukulélé</button></div>
+  <div id="note">–</div>
+  <div id="freq"></div>
+  <div class="meter">
+    <div class="tick" style="left:0"></div><div class="tick" style="left:25%"></div>
+    <div class="tick c"></div>
+    <div class="tick" style="left:75%"></div><div class="tick" style="left:calc(100% - 2px)"></div>
+    <div id="needle"></div>
+  </div>
+  <div id="cents"></div>
+  <div class="strings" id="strings"></div>
+  <button id="start">Démarrer</button>
+  <div id="msg">Touchez « Démarrer » et autorisez le micro.</div>
+</main>
+<script src="pitch.js"></script>
+<script>
+const NAMES = ['Do','Do♯','Ré','Ré♯','Mi','Fa','Fa♯','Sol','Sol♯','La','La♯','Si'];
+const TUNINGS = {
+  guit: [['Mi',82.41],['La',110],['Ré',146.83],['Sol',196],['Si',246.94],['Mi',329.63]],
+  uke:  [['Sol',392],['Do',261.63],['Mi',329.63],['La',440]]
+};
+const $ = id => document.getElementById(id);
+let a4 = +localStorage.getItem('a4') || 440, mode = 'chro', target = null;
+let ctx, analyser, buf, smooth = null, lastHeard = 0;
+
+function setA4(v){ a4 = Math.min(460, Math.max(415, v)); localStorage.setItem('a4', a4); $('a4').textContent = `A4 = ${a4} Hz`; }
+setA4(a4);
+$('m').onclick = () => setA4(a4-1); $('p').onclick = () => setA4(a4+1);
+
+function renderStrings(){
+  const box = $('strings'); box.innerHTML = '';
+  (TUNINGS[mode] || []).forEach((s,i) => {
+    const b = document.createElement('button'); b.textContent = s[0];
+    b.onclick = () => { target = target === i ? null : i; renderStrings(); };
+    if (target === i) b.className = 'on';
+    box.appendChild(b);
+  });
+}
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  mode = b.dataset.mode; target = null;
+  document.querySelectorAll('.modes button').forEach(x => x.classList.toggle('on', x === b));
+  renderStrings();
+});
+
+function analyse(f){
+  const scale = a4/440;
+  if (mode !== 'chro' && target !== null) {
+    const [n,hz] = TUNINGS[mode][target], t = hz*scale;
+    return {label:n, oct:'', cents:1200*Math.log2(f/t), hz:t};
+  }
+  if (mode !== 'chro') { // corde la plus proche
+    let best = 0, bd = 1e9;
+    TUNINGS[mode].forEach(([n,hz],i) => { const d = Math.abs(Math.log2(f/(hz*scale))); if (d<bd){bd=d;best=i;} });
+    const [n,hz] = TUNINGS[mode][best], t = hz*scale;
+    return {label:n, oct:'', cents:1200*Math.log2(f/t), hz:t};
+  }
+  const midi = Math.round(69 + 12*Math.log2(f/a4));
+  const t = a4*Math.pow(2,(midi-69)/12);
+  return {label:NAMES[((midi%12)+12)%12], oct:Math.floor(midi/12)-1, cents:1200*Math.log2(f/t), hz:t};
+}
+
+function show(r, f){
+  const c = Math.max(-50, Math.min(50, r.cents)), a = Math.abs(r.cents);
+  const col = a < 5 ? 'var(--ok)' : a < 15 ? 'var(--warn)' : 'var(--bad)';
+  $('note').innerHTML = r.label + (r.oct !== '' ? `<small>${r.oct}</small>` : '');
+  $('note').style.color = col;
+  $('needle').style.left = (50 + c) + '%';
+  $('needle').style.background = col;
+  $('freq').textContent = f.toFixed(1) + ' Hz';
+  $('cents').textContent = a < 5 ? 'Juste ✓' : (r.cents > 0 ? '▼ Trop haut ' : '▲ Trop bas ') + Math.round(a) + ' ¢';
+  $('cents').style.color = col;
+}
+function idle(){
+  $('note').textContent = '–'; $('note').style.color = 'var(--fg)';
+  $('needle').style.left = '50%'; $('needle').style.background = 'var(--mut)';
+  $('freq').textContent = ''; $('cents').textContent = '';
+}
+
+function loop(){
+  analyser.getFloatTimeDomainData(buf);
+  const f = detectPitch(buf, ctx.sampleRate);
+  const now = performance.now();
+  if (f > 0) {
+    // lissage, mais saut direct si la hauteur change nettement
+    smooth = (smooth && Math.abs(1200*Math.log2(f/smooth)) < 80) ? smooth*0.6 + f*0.4 : f;
+    lastHeard = now; show(analyse(smooth), smooth);
+  } else if (now - lastHeard > 600) { smooth = null; idle(); }
+  requestAnimationFrame(loop);
+}
+
+$('start').onclick = async () => {
+  try {
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error('Micro indisponible (HTTPS requis).');
+    const stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    await ctx.resume();
+    const src = ctx.createMediaStreamSource(stream);
+    analyser = ctx.createAnalyser(); analyser.fftSize = 4096;
+    buf = new Float32Array(analyser.fftSize);
+    src.connect(analyser);
+    $('start').style.display = 'none'; $('msg').textContent = 'Jouez une note…';
+    try { navigator.wakeLock?.request('screen'); } catch(e){}
+    loop();
+  } catch (e) {
+    $('msg').textContent = 'Erreur : ' + (e.message || e.name) + ' — vérifiez l’autorisation du micro dans Réglages > Safari.';
+  }
+};
+renderStrings();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
