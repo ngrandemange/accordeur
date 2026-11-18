@@ -155,7 +155,8 @@
   }
   async function play() {
     if (!S.notes.length) return;
-    ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); await ctx.resume();
+    audioMode('playback');
+    ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); await ctx.resume(); unlockAudio();
     wave = wave || ctx.createPeriodicWave(new Float32Array([0, 0, 0, 0, 0]), new Float32Array([0, 1, 0.45, 0.2, 0.1]));
     const d = S.res.staves[0].d, groups = []; const sorted = S.notes.map((n, i) => ({ n, i }));
     for (const it of sorted) { const g = groups[groups.length - 1]; if (g && g.n[0].staff === it.n.staff && Math.abs(g.n[0].x - it.n.x) < 0.8 * d) { g.n.push(it.n); g.i.push(it.i); } else groups.push({ n: [it.n], i: [it.i] }); }
@@ -164,7 +165,7 @@
       const dur = g.n[0].beats * spb;
       for (const n of g.n) {
         const o = ctx.createOscillator(), gn = ctx.createGain(); o.setPeriodicWave(wave); o.frequency.value = OMR.freqOf(n, a4);
-        const end = t + dur * 0.96, pk = 0.22 / Math.sqrt(g.n.length);
+        const end = t + dur * 0.96, pk = 0.32 / Math.sqrt(g.n.length);
         gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(pk, t + 0.02); gn.gain.setValueAtTime(pk, Math.max(t + 0.03, end - 0.06)); gn.gain.linearRampToValueAtTime(0, end);
         o.connect(gn).connect(ctx.destination); o.start(t); o.stop(end + 0.05); nodes.push({ o, g: gn });
       }

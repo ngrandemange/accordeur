@@ -196,7 +196,7 @@ nav button{width:50px}
     <div class="lbl"><span data-i18n="score.zoom"></span></div>
     <div class="bpmrow"><input id="sc-zoom" type="range" min="100" max="500" step="10"></div>
     <button id="sc-play" class="btn main" style="padding:14px;font-size:18px;border-radius:14px;border:0;background:var(--ok);color:#04130c;font-weight:700"></button>
-    <p class="hint" data-i18n="score.limits"></p>
+    <p class="hint" data-i18n="score.nosound"></p><p class="hint" data-i18n="score.limits"></p>
   </div>
 </section>
 <div id="sheet"></div>
@@ -232,6 +232,11 @@ const savePrefs = () => { try { localStorage.setItem('prefs', JSON.stringify(PRE
 if (!I18N[PREFS.lang]) PREFS.lang = 'fr';
 LANG = PREFS.lang; document.documentElement.lang = LANG;
 let curMsg = ['msg.idle'];
+// iOS : « playback » = son fort, haut-parleur, même en mode silencieux ; « play-and-record » seulement quand le micro écoute.
+function audioMode(m){ try { if (navigator.audioSession) navigator.audioSession.type = m; } catch (e) {} }
+function unlockAudio(){          // petit silence joué dans le geste de l'utilisateur : réveille l'audio iOS
+  try { const b = ctx.createBuffer(1, 1, 22050), src = ctx.createBufferSource(); src.buffer = b; src.connect(ctx.destination); src.start(0); } catch (e) {}
+}
 function setMsg(k, a){ curMsg = [k, a]; $('msg').textContent = tr(k, a); }
 const NAMES = ['Do','Do♯','Ré','Ré♯','Mi','Fa','Fa♯','Sol','Sol♯','La','La♯','Si'];
 const TUNINGS = {
@@ -380,8 +385,9 @@ function stopTone(){
 $('play').onclick = async () => {
   if (tone) return stopTone();
   const t = curTarget(); if (!t) return;
+  audioMode('playback');
   ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
-  await ctx.resume();
+  await ctx.resume(); unlockAudio();
   const osc = ctx.createOscillator(), gain = ctx.createGain();
   osc.setPeriodicWave(ctx.createPeriodicWave(new Float32Array([0,0,0,0,0]), new Float32Array([0,1,.45,.2,.1])));
   osc.frequency.value = t.hz;
@@ -396,7 +402,7 @@ $('start').onclick = async () => {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error(tr('msg.nomic'));
     const reuse = stream && stream.getAudioTracks().some(t => t.readyState === 'live');
     if (reuse) stream.getTracks().forEach(t => { t.enabled = true; });
-    else stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    else { audioMode('play-and-record'); stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}}); }
     ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
     await ctx.resume();
     const src = ctx.createMediaStreamSource(stream);
@@ -477,8 +483,9 @@ function mDraw(){
   if (mRun) mRaf = requestAnimationFrame(mDraw);
 }
 async function startMetro(){
+  audioMode('playback');
   ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
-  await ctx.resume();
+  await ctx.resume(); unlockAudio();
   mRun = true; mBeat = 0; mSub = 0; mQueue = []; mNext = ctx.currentTime + 0.08;
   mTimer = setInterval(mSchedule, 25); mSchedule(); mDraw();
   $('mgo').textContent = tr('stop'); $('mgo').classList.add('on');
@@ -560,7 +567,8 @@ function stopMic(){
   stopTone();
   // on garde le flux (désactivé) pour ne pas redemander l'autorisation à chaque retour sur l'accordeur
   if (stream) stream.getTracks().forEach(t => { t.enabled = false; });
-  analyser = null; idle();
+  if (stream && !navigator.audioSession) { stream.getTracks().forEach(t => t.stop()); stream = null; }   // iOS ancien : sinon le son reste en mode « appel »
+  audioMode('playback'); analyser = null; idle();
   $('start').style.display = ''; setMsg('msg.idle'); $('lvl').style.width = '0';
 }
 function route(){

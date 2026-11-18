@@ -1,5 +1,19 @@
 [
  {
+  "version": "1.6.1",
+  "date": "2026-11-18",
+  "fr": [
+   "Son : lecture forcée en mode « playback » sur iOS (haut-parleur, fonctionne même en mode silencieux) et réveil de l'audio au toucher",
+   "Après l'accordeur, le son ne reste plus bloqué en mode « appel » (très faible)",
+   "Rappel dans la page Partition : vérifier l'interrupteur silencieux et le volume"
+  ],
+  "en": [
+   "Sound: playback mode forced on iOS (speaker, works in silent mode) and audio unlocked on tap",
+   "After the tuner, sound no longer stays in the quiet “call” mode",
+   "Reminder on the Score page: check the silent switch and the volume"
+  ]
+ },
+ {
   "version": "1.6.0",
   "date": "2026-11-18",
   "fr": [
