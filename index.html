@@ -45,6 +45,8 @@ h1{font-size:18px;margin:0;font-weight:600}
 nav{position:sticky;top:0;z-index:10;width:calc(100% + 32px);margin:0 -16px;padding:8px 16px;display:flex;justify-content:center;gap:10px;background:rgba(11,15,20,.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid #1d2630}
 nav button{width:56px;height:46px;border:0;border-radius:14px;background:transparent;color:var(--mut);display:flex;align-items:center;justify-content:center}
 nav button svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#ver{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums}
+nav{position:sticky}
 nav button.on{background:var(--card);color:var(--ok)}
 .view{display:none;flex:1;width:100%;max-width:460px;flex-direction:column;align-items:center}
 .view.on{display:flex}
@@ -68,6 +70,7 @@ nav button.on{background:var(--card);color:var(--ok)}
   <button data-go="accueil" aria-label="Accueil"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg></button>
   <button data-go="accordeur" aria-label="Accordeur"><svg viewBox="0 0 24 24"><path d="M3.5 17a8.5 8.5 0 0 1 17 0"/><path d="M12 17 16.5 9"/><circle cx="12" cy="17" r="1.2"/><path d="M12 8.5V7M6.8 10.3l-.9-.9M17.2 10.3l.9-.9"/></svg></button>
   <button data-go="metronome" aria-label="Métronome"><svg viewBox="0 0 24 24"><path d="M8.5 3h7l3.5 17.5H5z"/><path d="M12 16.5 15.5 7"/><path d="M13.3 10.5h3.2"/></svg></button>
+  <span id="ver"></span>
 </nav>
 
 <section class="view" id="v-accueil">
@@ -99,6 +102,7 @@ nav button.on{background:var(--card);color:var(--ok)}
   <div id="msg">Touchez « Démarrer » et autorisez le micro.</div>
 </main>
 </section>
+<script src="version.js"></script>
 <script src="pitch.js"></script>
 <script>
 const NAMES = ['Do','Do♯','Ré','Ré♯','Mi','Fa','Fa♯','Sol','Sol♯','La','La♯','Si'];
@@ -110,7 +114,7 @@ const TUNINGS = {
 const $ = id => document.getElementById(id);
 let a4 = +localStorage.getItem('a4') || 440, mode = localStorage.getItem('mode') || 'alto', target = null, near = null;
 if (!TUNINGS[mode] && mode !== 'chro') mode = 'alto';
-let stream = null, loopOn = false, ctx, analyser, buf, smooth = null, lastHeard = 0, lastTarget = null, tone = null, lastDetect = 0;
+let wired = false, stream = null, loopOn = false, ctx, analyser, buf, smooth = null, lastHeard = 0, lastTarget = null, tone = null, lastDetect = 0;
 
 function setA4(v){ a4 = Math.min(460, Math.max(415, v)); localStorage.setItem('a4', a4); $('a4').textContent = `A4 = ${a4} Hz`; }
 setA4(a4);
@@ -261,17 +265,21 @@ $('play').onclick = async () => {
 $('start').onclick = async () => {
   try {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('Micro indisponible (HTTPS requis).');
-    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    const reuse = stream && stream.getAudioTracks().some(t => t.readyState === 'live');
+    if (reuse) stream.getTracks().forEach(t => { t.enabled = true; });
+    else stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
     ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
     await ctx.resume();
     const src = ctx.createMediaStreamSource(stream);
     analyser = ctx.createAnalyser(); analyser.fftSize = 8192; analyser.smoothingTimeConstant = 0;
     buf = new Float32Array(analyser.fftSize);
     src.connect(analyser);
-    ctx.onstatechange = () => { if (ctx.state !== 'running') ctx.resume().catch(() => {}); };
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) ctx.resume().catch(() => {}); });
-    document.addEventListener('touchstart', () => { if (ctx.state !== 'running') ctx.resume().catch(() => {}); }, {passive:true});
-    stream.getAudioTracks()[0].onended = () => { $('msg').textContent = 'Micro coupé. Rechargez la page.'; };
+    if (!wired) { wired = true;
+      ctx.onstatechange = () => { if (ctx.state !== 'running') ctx.resume().catch(() => {}); };
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) ctx.resume().catch(() => {}); });
+      document.addEventListener('touchstart', () => { if (ctx.state !== 'running') ctx.resume().catch(() => {}); }, {passive:true});
+      stream.getAudioTracks()[0].onended = () => { $('msg').textContent = 'Micro coupé. Rechargez la page.'; };
+    }
     $('start').style.display = 'none'; $('msg').textContent = 'Jouez une note…';
     navigator.wakeLock?.request('screen').catch(()=>{});
     if (!loopOn) { loopOn = true; loop(); }
@@ -284,20 +292,30 @@ renderStrings(); updatePlay();
 // --- navigation (#accueil, #accordeur, #metronome)
 function stopMic(){
   stopTone();
-  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  // on garde le flux (désactivé) pour ne pas redemander l'autorisation à chaque retour sur l'accordeur
+  if (stream) stream.getTracks().forEach(t => { t.enabled = false; });
   analyser = null; idle();
   $('start').style.display = ''; $('msg').textContent = 'Touchez « Démarrer » et autorisez le micro.'; $('lvl').style.width = '0';
 }
 function route(){
   const page = ['accueil','accordeur','metronome'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'accueil';
-  if (page !== 'accordeur' && stream) stopMic();
+  if (page !== 'accordeur' && analyser) stopMic();
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'v-' + page));
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.go === page));
 }
 document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { location.hash = b.dataset.go; });
 window.addEventListener('hashchange', route);
 route();
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+$('ver').textContent = 'v' + APP_VERSION;
+// Mise à jour automatique : le service worker est vérifié à chaque ouverture ; si une nouvelle version
+// prend le relais, la page se recharge une fois toute seule.
+if ('serviceWorker' in navigator) {
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
+  navigator.serviceWorker.register('sw.js', {updateViaCache: 'none'}).then(reg => reg.update()).catch(() => {});
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {}); });
+}
 </script>
 </body>
 </html>
