@@ -111,6 +111,7 @@ nav button.on{background:var(--card);color:var(--ok)}
   <div class="lbl">Subdivision</div>
   <div class="chips" id="subs"></div>
   <div class="dots" id="dots"></div>
+  <div class="bpmrow" style="gap:10px"><span>🔈</span><input id="vol" type="range" min="0" max="100" step="1" aria-label="Volume du clic"><span>🔊</span></div>
   <div class="opts"><button id="oflash">Flash écran</button><button id="osound">Son</button></div>
   <button id="mgo">Démarrer</button>
 </section>
@@ -325,7 +326,7 @@ renderStrings(); updatePlay();
 // ================= MÉTRONOME =================
 const SIGS = {'2/4':{n:2,acc:[0]},'3/4':{n:3,acc:[0]},'4/4':{n:4,acc:[0]},'6/8':{n:6,acc:[0,3]},'Libre':{n:4,acc:[]}};
 const SUBS = [['Noires',1],['Croches',2],['Triolets',3],['Doubles',4]];
-const M = Object.assign({bpm:100, sig:'4/4', sub:1, flash:false, sound:true},
+const M = Object.assign({bpm:100, sig:'4/4', sub:1, flash:false, sound:true, vol:80},
   (() => { try { return JSON.parse(localStorage.getItem('metro')) || {}; } catch (e) { return {}; } })());
 if (!SIGS[M.sig]) M.sig = '4/4';
 let mRun = false, mNext = 0, mBeat = 0, mSub = 0, mTimer = null, mQueue = [], mRaf = 0, mWake = null;
@@ -354,7 +355,7 @@ function click(time, kind){            // kind: 2 accent fort, 1 temps, 0 subdiv
   const o = ctx.createOscillator(), g = ctx.createGain();
   const [hz, vol] = kind === 2 ? [1500, 1] : kind === 3 ? [1250, .85] : kind === 1 ? [1000, .7] : [800, .3];
   o.frequency.value = hz; o.type = 'square';
-  g.gain.setValueAtTime(0, time); g.gain.linearRampToValueAtTime(vol * .5, time + .002); g.gain.exponentialRampToValueAtTime(.0001, time + .045);
+  g.gain.setValueAtTime(0, time); g.gain.linearRampToValueAtTime(Math.max(.0002, vol * .5 * Math.pow(M.vol / 100, 2)), time + .002); g.gain.exponentialRampToValueAtTime(.0001, time + .045);
   o.connect(g).connect(ctx.destination); o.start(time); o.stop(time + .06);
 }
 function mSchedule(){
@@ -396,6 +397,8 @@ function stopMetro(){
 $('mgo').onclick = () => mRun ? stopMetro() : startMetro();
 $('oflash').onclick = () => { M.flash = !M.flash; saveM(); renderChips(); };
 $('osound').onclick = () => { M.sound = !M.sound; saveM(); renderChips(); };
+$('vol').value = M.vol;
+$('vol').oninput = e => { M.vol = +e.target.value; saveM(); };
 $('bslide').oninput = e => setBpm(+e.target.value);
 function holdBtn(id, delta){           // appui long = répétition
   const b = $(id); let t, i;
