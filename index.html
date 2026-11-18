@@ -112,6 +112,29 @@ nav.home button:not(.cfg){display:none}
 #modal h3{margin:0 0 8px;font-size:20px}
 #modal ul{padding-left:20px;margin:8px 0 16px;font-size:15px;line-height:1.4}
 #modal button{width:100%;padding:12px;border:0;border-radius:12px;background:var(--ok);color:#04130c;font-size:17px;font-weight:700}
+
+.isles{gap:22px}
+.isle{width:min(70%,260px);aspect-ratio:1.55;font-size:20px}
+.isle svg{width:44px;height:44px}
+.isle.s{background:linear-gradient(145deg,#ffb86b,#e0558a);border-radius:52% 48% 40% 60% / 45% 55% 45% 55%;animation-delay:-1.2s}
+nav button{width:50px}
+#v-partition{align-items:stretch;gap:10px;padding-bottom:20px}
+#v-partition .btn,#v-partition .opts button{padding:10px 16px;border-radius:20px;border:0;background:var(--card);color:var(--fg);font-size:15px}
+#v-partition .btn.main{background:var(--ok);color:#04130c;font-weight:700}
+.hint{color:var(--mut);font-size:13px;line-height:1.4}
+#sc-wrap{overflow:auto;background:#10161d;border-radius:12px;max-height:46vh;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y pinch-zoom}
+#sc-canvas{display:block;height:auto}
+#sc-busy{display:none;text-align:center;color:var(--ok);padding:20px}
+#sheet{visibility:hidden;position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--card);border-radius:18px 18px 0 0;padding:14px 16px calc(14px + env(safe-area-inset-bottom));transform:translateY(110%);transition:transform .2s;box-shadow:0 -10px 30px rgba(0,0,0,.5)}
+#sheet.on{transform:none;visibility:visible}
+#sheet h3{margin:0 0 8px;font-size:18px}
+#sheet .chips{justify-content:flex-start;margin:6px 0}
+#sheet button{padding:9px 14px;border-radius:18px;border:0;background:#222c38;color:var(--fg);font-size:15px}
+#sheet button.on{background:var(--fg);color:var(--bg)}
+#sheet button.del{background:var(--bad);color:#fff}
+#v-partition .chips{justify-content:flex-start}
+#sc-play{width:100%}
+.isle.s small{opacity:.85}
 </style>
 </head>
 <body>
@@ -119,6 +142,7 @@ nav.home button:not(.cfg){display:none}
   <button data-go="accueil" data-i18n-aria="nav.home"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg></button>
   <button data-go="accordeur" data-i18n-aria="nav.tuner"><svg viewBox="0 0 24 24"><path d="M3.5 17a8.5 8.5 0 0 1 17 0"/><path d="M12 17 16.5 9"/><circle cx="12" cy="17" r="1.2"/><path d="M12 8.5V7M6.8 10.3l-.9-.9M17.2 10.3l.9-.9"/></svg></button>
   <button data-go="metronome" data-i18n-aria="nav.metro"><svg viewBox="0 0 24 24"><path d="M8.5 3h7l3.5 17.5H5z"/><path d="M12 16.5 15.5 7"/><path d="M13.3 10.5h3.2"/></svg></button>
+  <button data-go="partition" data-i18n-aria="nav.score"><svg viewBox="0 0 24 24"><path d="M4 8h16M4 11h16M4 14h16M4 17h16M4 20h16" transform="translate(0 -3)"/><ellipse cx="9" cy="14.2" rx="2" ry="1.4" fill="currentColor" stroke="none"/><path d="M11 14V6.5"/></svg></button>
   <button class="cfg" data-go="reglages" data-i18n-aria="nav.settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 14.5a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3h0a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8v0a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></button>
   <span id="ver"></span>
 </nav>
@@ -127,6 +151,7 @@ nav.home button:not(.cfg){display:none}
   <div class="isles">
     <button class="isle t" data-go="accordeur"><svg viewBox="0 0 24 24"><path d="M3.5 17a8.5 8.5 0 0 1 17 0"/><path d="M12 17 16.5 9"/><circle cx="12" cy="17" r="1.2"/><path d="M12 8.5V7M6.8 10.3l-.9-.9M17.2 10.3l.9-.9"/></svg><span data-i18n="nav.tuner"></span><small data-i18n="tile.tuner.sub"></small></button>
     <button class="isle m" data-go="metronome"><svg viewBox="0 0 24 24"><path d="M8.5 3h7l3.5 17.5H5z"/><path d="M12 16.5 15.5 7"/><path d="M13.3 10.5h3.2"/></svg><span data-i18n="nav.metro"></span><small data-i18n="tile.metro.sub"></small></button>
+    <button class="isle s" data-go="partition"><svg viewBox="0 0 24 24"><path d="M4 8h16M4 11h16M4 14h16M4 17h16M4 20h16" transform="translate(0 -3)"/><ellipse cx="9" cy="14.2" rx="2" ry="1.4" fill="currentColor" stroke="none"/><path d="M11 14V6.5"/></svg><span data-i18n="nav.score"></span><small data-i18n="tile.score.sub"></small></button>
   </div>
 </section>
 
@@ -158,6 +183,23 @@ nav.home button:not(.cfg){display:none}
   <div class="lbl" data-i18n="set.notes"></div>
   <div id="p-notes"></div>
 </section>
+<section class="view" id="v-partition">
+  <div class="opts"><label class="btn main" id="sc-pick"><span data-i18n="score.photo"></span><input id="sc-file" type="file" accept="image/*" hidden></label><button id="sc-del" data-i18n="score.del"></button></div>
+  <div class="hint" id="sc-info"></div>
+  <div id="sc-busy"></div>
+  <div id="sc-wrap"><canvas id="sc-canvas"></canvas></div>
+  <div id="sc-tools" style="display:none">
+    <div class="lbl" data-i18n="score.clef"></div><div class="chips" id="sc-clef"></div>
+    <div class="lbl" data-i18n="score.key"></div><div class="chips" id="sc-key"></div>
+    <div class="lbl"><span data-i18n="score.tempo"></span> <b id="sc-bpm"></b></div>
+    <div class="bpmrow"><input id="sc-tempo" type="range" min="40" max="200" step="1"></div>
+    <div class="lbl"><span data-i18n="score.zoom"></span></div>
+    <div class="bpmrow"><input id="sc-zoom" type="range" min="100" max="500" step="10"></div>
+    <button id="sc-play" class="btn main" style="padding:14px;font-size:18px;border-radius:14px;border:0;background:var(--ok);color:#04130c;font-weight:700"></button>
+    <p class="hint" data-i18n="score.limits"></p>
+  </div>
+</section>
+<div id="sheet"></div>
 <div id="modal"><div class="box"><h3 id="m-title"></h3><ul id="m-list"></ul><button id="m-ok"></button></div></div>
 <div id="flash"></div>
 <div id="ptr"><svg viewBox="0 0 24 24"><path d="M20.23 10.33 L22.91 10.57 L22.91 13.43 L20.23 13.67 L19.00 16.64 L20.72 18.70 L18.70 20.72 L16.64 19.00 L13.67 20.23 L13.43 22.91 L10.57 22.91 L10.33 20.23 L7.36 19.00 L5.30 20.72 L3.28 18.70 L5.00 16.64 L3.77 13.67 L1.09 13.43 L1.09 10.57 L3.77 10.33 L5.00 7.36 L3.28 5.30 L5.30 3.28 L7.36 5.00 L10.33 3.77 L10.57 1.09 L13.43 1.09 L13.67 3.77 L16.64 5.00 L18.70 3.28 L20.72 5.30 L19.00 7.36Z"/><circle cx="12" cy="12" r="3.4"/></svg></div>
@@ -522,9 +564,10 @@ function stopMic(){
   $('start').style.display = ''; setMsg('msg.idle'); $('lvl').style.width = '0';
 }
 function route(){
-  const page = ['accueil','accordeur','metronome','reglages'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'accueil';
+  const page = ['accueil','accordeur','metronome','partition','reglages'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'accueil';
   if (page !== 'accordeur' && analyser) stopMic();
   if (page !== 'metronome') stopMetro();
+  if (window.scoreRoute) window.scoreRoute(page);
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'v-' + page));
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.go === page));
   document.querySelector('nav').classList.toggle('home', page === 'accueil');
@@ -539,7 +582,7 @@ function applyLang(){
   document.documentElement.lang = LANG;
   document.querySelectorAll('[data-i18n]').forEach(e => { e.textContent = tr(e.dataset.i18n); });
   document.querySelectorAll('[data-i18n-aria]').forEach(e => e.setAttribute('aria-label', tr(e.dataset.i18nAria)));
-  renderStrings(); updatePlay(); renderChips(); setMsg(...curMsg); renderSettings();
+  renderStrings(); updatePlay(); renderChips(); setMsg(...curMsg); renderSettings(); if (window.scoreRefresh) window.scoreRefresh();
 }
 function renderSettings(){
   const mk = (box, items, cur, fn) => { box.innerHTML = ''; items.forEach(([label, val]) => {
@@ -583,5 +626,7 @@ if ('serviceWorker' in navigator) {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {}); });
 }
 </script>
+<script src="omr.js"></script>
+<script src="score.js"></script>
 </body>
 </html>
