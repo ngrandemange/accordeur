@@ -29,6 +29,11 @@ main{flex:1;width:100%;max-width:460px;display:flex;flex-direction:column;align-
 #cents{font-size:22px;font-variant-numeric:tabular-nums;min-height:28px}
 .strings{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .strings button{min-width:52px;padding:10px 0;border-radius:10px;border:0;background:var(--card);color:var(--fg);font-size:16px}
+.strings button.auto{color:var(--mut)}
+.strings button.auto.on{color:var(--fg)}
+#play{padding:12px 26px;font-size:17px;border:0;border-radius:12px;background:var(--card);color:var(--fg)}
+#play:disabled{opacity:.4}
+#play.on{background:var(--warn);color:#201400}
 .strings button.near{background:#233042}
 .strings button.on{outline:2px solid var(--ok)}
 #start{padding:16px 40px;font-size:20px;border:0;border-radius:14px;background:var(--ok);color:#04130c;font-weight:700}
@@ -50,6 +55,7 @@ main{flex:1;width:100%;max-width:460px;display:flex;flex-direction:column;align-
   <div class="meter"><svg id="gauge" viewBox="0 0 300 165" width="100%"><path d="M41.2 99.3A120 120 0 0 1 109.9 36.9" stroke="#ff5d5d55" stroke-width="16" fill="none" stroke-linecap="butt"/><path d="M109.9 36.9A120 120 0 0 1 136.4 30.8" stroke="#ffb02066" stroke-width="16" fill="none" stroke-linecap="butt"/><path d="M136.4 30.8A120 120 0 0 1 163.6 30.8" stroke="#2ee59d" stroke-width="16" fill="none" stroke-linecap="butt"/><path d="M163.6 30.8A120 120 0 0 1 190.1 36.9" stroke="#ffb02066" stroke-width="16" fill="none" stroke-linecap="butt"/><path d="M190.1 36.9A120 120 0 0 1 258.8 99.3" stroke="#ff5d5d55" stroke-width="16" fill="none" stroke-linecap="butt"/><line x1="53.9" y1="105.2" x2="64.8" y2="110.3" stroke="#7d8a99" stroke-width="2"/><line x1="66.5" y1="84.7" x2="72.8" y2="89.7" stroke="#7d8a99" stroke-width="2"/><line x1="83.3" y1="67.6" x2="88.3" y2="73.8" stroke="#7d8a99" stroke-width="2"/><line x1="103.5" y1="54.7" x2="107.0" y2="61.9" stroke="#7d8a99" stroke-width="2"/><line x1="126.2" y1="46.7" x2="128.0" y2="54.5" stroke="#7d8a99" stroke-width="2"/><line x1="150.0" y1="44.0" x2="150.0" y2="56.0" stroke="#7d8a99" stroke-width="2"/><line x1="173.8" y1="46.7" x2="172.0" y2="54.5" stroke="#7d8a99" stroke-width="2"/><line x1="196.5" y1="54.7" x2="193.0" y2="61.9" stroke="#7d8a99" stroke-width="2"/><line x1="216.7" y1="67.6" x2="211.7" y2="73.8" stroke="#7d8a99" stroke-width="2"/><line x1="233.5" y1="84.7" x2="227.2" y2="89.7" stroke="#7d8a99" stroke-width="2"/><line x1="246.1" y1="105.2" x2="235.2" y2="110.3" stroke="#7d8a99" stroke-width="2"/><text x="32" y="40" fill="#ff8a8a" font-size="26" font-weight="700" text-anchor="middle">♭</text><text x="268" y="40" fill="#ff8a8a" font-size="26" font-weight="700" text-anchor="middle">♯</text><text x="32" y="62" fill="#7d8a99" font-size="11" text-anchor="middle">trop bas</text><text x="268" y="62" fill="#7d8a99" font-size="11" text-anchor="middle">trop haut</text><g id="needle" style="transform-origin:150px 150px;transform:rotate(0deg);transition:transform .12s linear"><line x1="150" y1="150" x2="150" y2="48" stroke="#e8eef5" stroke-width="5" stroke-linecap="round"/></g><circle cx="150" cy="150" r="9" fill="#e8eef5"/></svg></div>
   <div id="cents"></div>
   <div class="strings" id="strings"></div>
+  <button id="play" disabled>🔊 Jouer la note</button>
   <button id="start">Démarrer</button>
   <div id="msg">Touchez « Démarrer » et autorisez le micro.</div>
 </main>
@@ -64,7 +70,7 @@ const TUNINGS = {
 const $ = id => document.getElementById(id);
 let a4 = +localStorage.getItem('a4') || 440, mode = localStorage.getItem('mode') || 'alto', target = null, near = null;
 if (!TUNINGS[mode] && mode !== 'chro') mode = 'alto';
-let ctx, analyser, buf, smooth = null, lastHeard = 0;
+let ctx, analyser, buf, smooth = null, lastHeard = 0, lastTarget = null, tone = null;
 
 function setA4(v){ a4 = Math.min(460, Math.max(415, v)); localStorage.setItem('a4', a4); $('a4').textContent = `A4 = ${a4} Hz`; }
 setA4(a4);
@@ -72,32 +78,38 @@ $('m').onclick = () => setA4(a4-1); $('p').onclick = () => setA4(a4+1);
 
 function renderStrings(){
   const box = $('strings'); box.innerHTML = '';
+  if (TUNINGS[mode]) {
+    const a = document.createElement('button'); a.textContent = 'Auto';
+    a.className = 'auto' + (target === null ? ' on' : '');
+    a.onclick = () => { target = null; renderStrings(); updatePlay(); };
+    box.appendChild(a);
+  }
   (TUNINGS[mode] || []).forEach((s,i) => {
     const b = document.createElement('button'); b.innerHTML = `${s[0]}<small style="color:var(--mut)">${s[2]}</small>`;
-    b.onclick = () => { target = target === i ? null : i; renderStrings(); };
+    b.onclick = () => { target = target === i ? null : i; renderStrings(); updatePlay(); };
     if (target === i) b.className = 'on'; else if (target === null && near === i) b.className = 'near';
     box.appendChild(b);
   });
 }
 document.querySelectorAll('.modes button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
 document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
-  mode = b.dataset.mode; target = null; near = null; localStorage.setItem('mode', mode);
+  mode = b.dataset.mode; target = null; near = null; lastTarget = null; stopTone(); localStorage.setItem('mode', mode);
   document.querySelectorAll('.modes button').forEach(x => x.classList.toggle('on', x === b));
-  renderStrings();
+  renderStrings(); updatePlay();
 });
 
 function analyse(f){
   const scale = a4/440;
   if (mode !== 'chro' && target !== null) {
     const [n,hz] = TUNINGS[mode][target], t = hz*scale;
-    return {label:n, oct:'', cents:1200*Math.log2(f/t), hz:t};
+    return {label:n, oct:TUNINGS[mode][target][2], cents:1200*Math.log2(f/t), hz:t};
   }
   if (mode !== 'chro') { // corde la plus proche
     let best = 0, bd = 1e9;
     TUNINGS[mode].forEach(([n,hz],i) => { const d = Math.abs(Math.log2(f/(hz*scale))); if (d<bd){bd=d;best=i;} });
     const [n,hz] = TUNINGS[mode][best], t = hz*scale;
     if (near !== best) { near = best; renderStrings(); }
-    return {label:n, oct:'', cents:1200*Math.log2(f/t), hz:t};
+    return {label:n, oct:TUNINGS[mode][best][2], cents:1200*Math.log2(f/t), hz:t};
   }
   const midi = Math.round(69 + 12*Math.log2(f/a4));
   const t = a4*Math.pow(2,(midi-69)/12);
@@ -105,6 +117,7 @@ function analyse(f){
 }
 
 function show(r, f){
+  lastTarget = r; updatePlay();
   const c = Math.max(-50, Math.min(50, r.cents)), a = Math.abs(r.cents);
   const col = a < 5 ? 'var(--ok)' : a < 15 ? 'var(--warn)' : 'var(--bad)';
   $('note').innerHTML = r.label + (r.oct !== '' ? `<small>${r.oct}</small>` : '');
@@ -122,6 +135,7 @@ function idle(){
 }
 
 function loop(){
+  if (tone) { lastHeard = performance.now(); requestAnimationFrame(loop); return; }
   analyser.getFloatTimeDomainData(buf);
   const f = detectPitch(buf, ctx.sampleRate);
   const now = performance.now();
@@ -133,11 +147,41 @@ function loop(){
   requestAnimationFrame(loop);
 }
 
+function curTarget(){
+  if (mode !== 'chro' && target !== null) { const [n,hz,o] = TUNINGS[mode][target]; return {label:n, oct:o, hz:hz*a4/440}; }
+  return lastTarget;
+}
+function updatePlay(){
+  const t = curTarget(), b = $('play');
+  b.disabled = !t && !tone;
+  b.classList.toggle('on', !!tone);
+  b.textContent = tone ? '■ Stop' : t ? `🔊 Jouer ${t.label}${t.oct}` : '🔊 Jouer la note';
+}
+function stopTone(){
+  if (!tone) return;
+  const {osc, gain, timer} = tone; tone = null; clearTimeout(timer);
+  const t = ctx.currentTime; gain.gain.cancelScheduledValues(t); gain.gain.setTargetAtTime(0, t, 0.05);
+  osc.stop(t + 0.3); updatePlay();
+}
+$('play').onclick = async () => {
+  if (tone) return stopTone();
+  const t = curTarget(); if (!t) return;
+  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+  await ctx.resume();
+  const osc = ctx.createOscillator(), gain = ctx.createGain();
+  osc.setPeriodicWave(ctx.createPeriodicWave(new Float32Array([0,0,0,0,0]), new Float32Array([0,1,.45,.2,.1])));
+  osc.frequency.value = t.hz;
+  gain.gain.setValueAtTime(0, ctx.currentTime); gain.gain.linearRampToValueAtTime(0.4, ctx.currentTime + 0.04);
+  osc.connect(gain).connect(ctx.destination); osc.start();
+  tone = {osc, gain, timer: setTimeout(stopTone, 6000)};
+  updatePlay();
+  if (!analyser) { $('note').innerHTML = t.label + `<small>${t.oct}</small>`; }
+};
 $('start').onclick = async () => {
   try {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('Micro indisponible (HTTPS requis).');
     const stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
-    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
     await ctx.resume();
     const src = ctx.createMediaStreamSource(stream);
     analyser = ctx.createAnalyser(); analyser.fftSize = 4096;
@@ -150,7 +194,7 @@ $('start').onclick = async () => {
     $('msg').textContent = 'Erreur : ' + (e.message || e.name) + ' — vérifiez l’autorisation du micro dans Réglages > Safari.';
   }
 };
-renderStrings();
+renderStrings(); updatePlay();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>
