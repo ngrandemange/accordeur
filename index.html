@@ -16,11 +16,11 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:-apple-system,system-ui,sans-serif;overscroll-behavior:none}
 body{display:flex;flex-direction:column;align-items:center;padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom);user-select:none;-webkit-user-select:none}
-header{width:100%;max-width:460px;display:flex;justify-content:space-between;align-items:center;padding:12px 0}
+#v-accordeur header{width:100%;max-width:460px;display:flex;justify-content:space-between;align-items:center;padding:12px 0}
 h1{font-size:18px;margin:0;font-weight:600}
 .ref{display:flex;align-items:center;gap:10px;color:var(--mut);font-size:14px}
 .ref button{width:34px;height:34px;border-radius:50%;border:0;background:var(--card);color:var(--fg);font-size:20px}
-main{flex:1;width:100%;max-width:460px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+#v-accordeur main{flex:1;width:100%;max-width:460px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
 #note{font-size:120px;font-weight:700;line-height:1;transition:color .15s}
 #note small{font-size:40px;font-weight:500;vertical-align:top}
 #freq{color:var(--mut);font-size:18px;font-variant-numeric:tabular-nums;min-height:24px}
@@ -41,9 +41,47 @@ main{flex:1;width:100%;max-width:460px;display:flex;flex-direction:column;align-
 .modes{display:flex;gap:8px}
 .modes button{padding:8px 14px;border-radius:20px;border:0;background:var(--card);color:var(--mut)}
 .modes button.on{background:var(--fg);color:var(--bg)}
+
+nav{position:sticky;top:0;z-index:10;width:calc(100% + 32px);margin:0 -16px;padding:8px 16px;display:flex;justify-content:center;gap:10px;background:rgba(11,15,20,.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid #1d2630}
+nav button{width:56px;height:46px;border:0;border-radius:14px;background:transparent;color:var(--mut);display:flex;align-items:center;justify-content:center}
+nav button svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{background:var(--card);color:var(--ok)}
+.view{display:none;flex:1;width:100%;max-width:460px;flex-direction:column;align-items:center}
+.view.on{display:flex}
+/* accueil : îles */
+.isles{flex:1;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:34px;padding:20px 0}
+.isle{position:relative;width:78%;max-width:300px;aspect-ratio:1.25;border:0;color:#fff;font-size:22px;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  border-radius:58% 42% 55% 45% / 48% 56% 44% 52%;box-shadow:0 22px 30px -12px rgba(0,0,0,.7),inset 0 -10px 0 rgba(0,0,0,.18);animation:float 5s ease-in-out infinite}
+.isle svg{width:56px;height:56px;fill:none;stroke:#fff;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.isle small{font-size:13px;font-weight:500;opacity:.8}
+.isle.t{background:linear-gradient(145deg,#2ee59d,#0f8a78)}
+.isle.m{background:linear-gradient(145deg,#6aa8ff,#4a4fd0);border-radius:44% 56% 42% 58% / 56% 44% 58% 42%;animation-delay:-2.5s}
+.isle:active{transform:scale(.97)}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+.soon{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--mut);text-align:center}
+.soon svg{width:72px;height:72px;fill:none;stroke:var(--mut);stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+.soon h2{margin:0;color:var(--fg)}
 </style>
 </head>
 <body>
+<nav>
+  <button data-go="accueil" aria-label="Accueil"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg></button>
+  <button data-go="accordeur" aria-label="Accordeur"><svg viewBox="0 0 24 24"><path d="M3.5 17a8.5 8.5 0 0 1 17 0"/><path d="M12 17 16.5 9"/><circle cx="12" cy="17" r="1.2"/><path d="M12 8.5V7M6.8 10.3l-.9-.9M17.2 10.3l.9-.9"/></svg></button>
+  <button data-go="metronome" aria-label="Métronome"><svg viewBox="0 0 24 24"><path d="M8.5 3h7l3.5 17.5H5z"/><path d="M12 16.5 15.5 7"/><path d="M13.3 10.5h3.2"/></svg></button>
+</nav>
+
+<section class="view" id="v-accueil">
+  <div class="isles">
+    <button class="isle t" data-go="accordeur"><svg viewBox="0 0 24 24"><path d="M3.5 17a8.5 8.5 0 0 1 17 0"/><path d="M12 17 16.5 9"/><circle cx="12" cy="17" r="1.2"/><path d="M12 8.5V7M6.8 10.3l-.9-.9M17.2 10.3l.9-.9"/></svg>Accordeur<small>Alto · Violon · Guitare</small></button>
+    <button class="isle m" data-go="metronome"><svg viewBox="0 0 24 24"><path d="M8.5 3h7l3.5 17.5H5z"/><path d="M12 16.5 15.5 7"/><path d="M13.3 10.5h3.2"/></svg>Métronome<small>Bientôt</small></button>
+  </div>
+</section>
+
+<section class="view" id="v-metronome">
+  <div class="soon"><svg viewBox="0 0 24 24"><path d="M8.5 3h7l3.5 17.5H5z"/><path d="M12 16.5 15.5 7"/><path d="M13.3 10.5h3.2"/></svg><h2>Métronome</h2><div>Bientôt disponible.</div></div>
+</section>
+
+<section class="view" id="v-accordeur">
 <header>
   <h1>Accordeur</h1>
   <div class="ref"><button id="m">−</button><span id="a4">A4 = 440 Hz</span><button id="p">+</button></div>
@@ -60,6 +98,7 @@ main{flex:1;width:100%;max-width:460px;display:flex;flex-direction:column;align-
   <div id="level" style="width:100%;max-width:340px;height:4px;background:var(--card);border-radius:2px;overflow:hidden"><div id="lvl" style="height:100%;width:0;background:var(--ok);transition:width .1s"></div></div>
   <div id="msg">Touchez « Démarrer » et autorisez le micro.</div>
 </main>
+</section>
 <script src="pitch.js"></script>
 <script>
 const NAMES = ['Do','Do♯','Ré','Ré♯','Mi','Fa','Fa♯','Sol','Sol♯','La','La♯','Si'];
@@ -71,7 +110,7 @@ const TUNINGS = {
 const $ = id => document.getElementById(id);
 let a4 = +localStorage.getItem('a4') || 440, mode = localStorage.getItem('mode') || 'alto', target = null, near = null;
 if (!TUNINGS[mode] && mode !== 'chro') mode = 'alto';
-let ctx, analyser, buf, smooth = null, lastHeard = 0, lastTarget = null, tone = null, lastDetect = 0;
+let stream = null, loopOn = false, ctx, analyser, buf, smooth = null, lastHeard = 0, lastTarget = null, tone = null, lastDetect = 0;
 
 function setA4(v){ a4 = Math.min(460, Math.max(415, v)); localStorage.setItem('a4', a4); $('a4').textContent = `A4 = ${a4} Hz`; }
 setA4(a4);
@@ -160,6 +199,7 @@ function detect(){
   return x.index < 0 ? {rms: x.rms, freq: -1} : {...x, idx: ids[x.index]};
 }
 function loop(){
+  if (!analyser) { loopOn = false; return; }
   requestAnimationFrame(loop);
   if (tone) { lastHeard = performance.now(); return; }
   const now = performance.now();
@@ -221,7 +261,7 @@ $('play').onclick = async () => {
 $('start').onclick = async () => {
   try {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('Micro indisponible (HTTPS requis).');
-    const stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
     ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
     await ctx.resume();
     const src = ctx.createMediaStreamSource(stream);
@@ -234,12 +274,29 @@ $('start').onclick = async () => {
     stream.getAudioTracks()[0].onended = () => { $('msg').textContent = 'Micro coupé. Rechargez la page.'; };
     $('start').style.display = 'none'; $('msg').textContent = 'Jouez une note…';
     navigator.wakeLock?.request('screen').catch(()=>{});
-    loop();
+    if (!loopOn) { loopOn = true; loop(); }
   } catch (e) {
     $('msg').textContent = 'Erreur : ' + (e.message || e.name) + ' — vérifiez l’autorisation du micro dans Réglages > Safari.';
   }
 };
 renderStrings(); updatePlay();
+
+// --- navigation (#accueil, #accordeur, #metronome)
+function stopMic(){
+  stopTone();
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  analyser = null; idle();
+  $('start').style.display = ''; $('msg').textContent = 'Touchez « Démarrer » et autorisez le micro.'; $('lvl').style.width = '0';
+}
+function route(){
+  const page = ['accueil','accordeur','metronome'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'accueil';
+  if (page !== 'accordeur' && stream) stopMic();
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'v-' + page));
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.go === page));
+}
+document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { location.hash = b.dataset.go; });
+window.addEventListener('hashchange', route);
+route();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>
