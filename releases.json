@@ -1,5 +1,23 @@
 [
  {
+  "version": "1.7.0",
+  "date": "2026-11-18",
+  "fr": [
+   "Partition : reconnaissance de la clé (ut, sol, fa) et de l'armure (jusqu'à 7 dièses/bémols)",
+   "Partition : dièses, bémols et bécarres accidentels (valables jusqu'à la barre de mesure)",
+   "Partition : silences (soupir, demi-soupir, quart de soupir, pause, demi-pause) lus et joués comme du silence",
+   "Partition : notes pointées fiabilisées, nettoyage du bruit, agrandissement automatique des photos basse résolution",
+   "Partition : touchez une zone vide pour ajouter une note"
+  ],
+  "en": [
+   "Score: clef (C, treble, bass) and key signature (up to 7 sharps/flats) recognition",
+   "Score: accidental sharps, flats and naturals (valid until the bar line)",
+   "Score: rests (quarter, eighth, sixteenth, half, whole) are read and played as silence",
+   "Score: dotted notes made more reliable, noise cleaning, automatic upscaling of low-resolution photos",
+   "Score: tap an empty area to add a note"
+  ]
+ },
+ {
   "version": "1.6.1",
   "date": "2026-11-18",
   "fr": [

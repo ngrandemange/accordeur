@@ -2,12 +2,12 @@
 (() => {
   const $ = id => document.getElementById(id);
   const FR = { C: 'Do', D: 'Ré', E: 'Mi', F: 'Fa', G: 'Sol', A: 'La', B: 'Si' };
-  const S = { blob: null, quarter: 0, angle: 0, res: null, clef: null, key: 0, bpm: 90, zoom: 0, edits: {}, base: null, crop: null, notes: [], sel: -1, playing: null, busy: false, loaded: false };
+  const S = { blob: null, quarter: 0, angle: 0, res: null, clef: null, key: 0, bpm: 90, zoom: 0, edits: {}, extra: [], base: null, crop: null, notes: [], sel: -1, playing: null, busy: false, loaded: false };
 
   // ---------- stockage : une seule photo (IndexedDB) ----------
   const idb = () => new Promise((ok, ko) => { const r = indexedDB.open('accordeur', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => ok(r.result); r.onerror = () => ko(r.error); });
   const kv = async (mode, k, v) => { const db = await idb(); return new Promise((ok, ko) => { const st = db.transaction('kv', mode === 'get' ? 'readonly' : 'readwrite').objectStore('kv'); const q = mode === 'get' ? st.get(k) : mode === 'set' ? st.put(v, k) : st.delete(k); q.onsuccess = () => ok(q.result); q.onerror = () => ko(q.error); }); };
-  const saveScan = () => kv('set', 'scan', { quarter: S.quarter, angle: S.angle, res: S.res, clef: S.clef, key: S.key, bpm: S.bpm, zoom: S.zoom, edits: S.edits }).catch(() => {});
+  const saveScan = () => kv('set', 'scan', { extra: S.extra, scale: S.scale || 1, quarter: S.quarter, angle: S.angle, res: S.res, clef: S.clef, key: S.key, bpm: S.bpm, zoom: S.zoom, edits: S.edits }).catch(() => {});
 
   // ---------- calculs lourds dans un Worker (repli : fil principal) ----------
   let worker = null, wid = 0; const pend = {};
@@ -27,11 +27,11 @@
     const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); x.drawImage(bmp, 0, 0, W, H);
     return new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.88));
   }
-  async function renderBase(blob, quarter, angle) {   // image redressée (quart de tour + inclinaison)
-    const bmp = await loadBitmap(blob), bw = bmp.width, bh = bmp.height, sw = quarter % 2 ? bh : bw, sh = quarter % 2 ? bw : bh;
+  async function renderBase(blob, quarter, angle, scale = 1) {   // image redressée (quart de tour + inclinaison), éventuellement agrandie
+    const bmp = await loadBitmap(blob), bw = bmp.width, bh = bmp.height, sw = Math.round((quarter % 2 ? bh : bw) * scale), sh = Math.round((quarter % 2 ? bw : bh) * scale);
     const c = document.createElement('canvas'); c.width = sw; c.height = sh; const x = c.getContext('2d');
-    x.fillStyle = '#3a3a3a'; x.fillRect(0, 0, sw, sh);
-    x.translate(sw / 2, sh / 2); x.rotate(-angle * Math.PI / 180); x.rotate(quarter * Math.PI / 2); x.drawImage(bmp, -bw / 2, -bh / 2);
+    x.imageSmoothingQuality = 'high'; x.fillStyle = '#3a3a3a'; x.fillRect(0, 0, sw, sh);
+    x.translate(sw / 2, sh / 2); x.scale(scale, scale); x.rotate(-angle * Math.PI / 180); x.rotate(quarter * Math.PI / 2); x.drawImage(bmp, -bw / 2, -bh / 2);
     return c;
   }
   const grayOf = c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height); return OMR.toGray(d); };
@@ -42,9 +42,18 @@
       const { angle } = await call('angle', grayOf(c0), c0.width, c0.height);
       const c1 = await renderBase(blob, q, angle);
       const { res } = await call('analyze', grayOf(c1), c1.width, c1.height);
-      if (res.staves.length) { S.quarter = q; S.angle = angle; S.res = res; S.base = c1; return true; }
+      if (res.staves.length) {
+        S.quarter = q; S.angle = angle; S.res = res; S.base = c1; S.scale = 1;
+        const d = res.staves[0].d;
+        if (d < 12) {                                   // portées trop petites (photo basse résolution) : on agrandit puis on relit
+          const f = Math.min(14 / d, 3600 / Math.max(c1.width, c1.height));
+          if (f > 1.25) { const c2 = await renderBase(blob, q, angle, f), r2 = await call('analyze', grayOf(c2), c2.width, c2.height); if (r2.res.staves.length) { S.res = r2.res; S.base = c2; S.scale = f; } }
+        }
+        S.clef = S.res.clef || defClef(); S.key = S.res.key || 0;
+        return true;
+      }
     }
-    S.res = { staves: [], heads: [] }; S.base = null; return false;
+    S.res = { staves: [], heads: [], rests: [] }; S.base = null; return false;
   }
 
   // ---------- notes ----------
@@ -52,16 +61,21 @@
   function rebuildNotes() {
     S.notes = [];
     if (!S.res || !S.res.staves.length) return;
-    for (const n of OMR.toNotes(S.res, { clef: S.clef, key: S.key })) {
+    const items = OMR.toNotes(S.res, { clef: S.clef, key: S.key });
+    S.extra.forEach((x, k) => { const dia = OMR.CLEF_BASE[S.clef] + x.step; items.push({ id: 2000 + k, staff: x.staff, x: x.x, y: x.y, dia, alter: OMR.keyAlter(dia, S.key), beats: x.beats }); });
+    items.sort((a, b) => a.staff - b.staff || a.x - b.x);
+    for (const n of items) {
       const e = S.edits[n.id] || {};
       if (e.del) continue;
-      n.dia += e.shift || 0;
-      n.alter = e.alter !== undefined ? e.alter : OMR.keyAlter(n.dia, S.key);
+      if (!n.rest) {
+        if (e.shift) { n.dia += e.shift; n.alter = OMR.keyAlter(n.dia, S.key); }
+        if (e.alter !== undefined) n.alter = e.alter;
+      }
       if (e.beats !== undefined) n.beats = e.beats;
       S.notes.push(n);
     }
   }
-  const label = n => { const nm = OMR.nameOf(n); return (LANG === 'fr' ? FR[nm[0]] : nm[0]) + nm.slice(1); };
+  const label = n => { if (n.rest) return tr('score.rest'); const nm = OMR.nameOf(n); return (LANG === 'fr' ? FR[nm[0]] : nm[0]) + nm.slice(1); };
   const beatsTxt = b => ({ 4: '𝅝', 2: '𝅗𝅥', 1: '♩', 0.5: '♪', 0.25: '𝅘𝅥𝅯' }[b] || (b >= 1 ? String(b) : '·'));
 
   // ---------- affichage ----------
@@ -81,10 +95,10 @@
     const cur = S.playing ? S.playing.cur : -1;
     S.notes.forEach((n, i) => {
       const px = n.x - cr.x0, py = n.y - cr.y0, on = S.playing && S.playing.live.has(i), sel = i === S.sel;
-      x.lineWidth = Math.max(2, d * 0.15); x.strokeStyle = on ? '#2ee59d' : sel ? '#ffb020' : 'rgba(255,70,70,.9)';
+      x.lineWidth = Math.max(2, d * 0.15); x.strokeStyle = on ? '#2ee59d' : sel ? '#ffb020' : n.rest ? 'rgba(255,150,0,.95)' : 'rgba(255,70,70,.9)';
       x.fillStyle = on ? 'rgba(46,229,157,.45)' : 'rgba(0,0,0,0)';
-      x.beginPath(); x.arc(px, py, 0.85 * d, 0, 7); x.fill(); x.stroke();
-      const t = label(n) + (n.alter > 0 ? '♯' : n.alter < 0 ? '♭' : '');
+      x.beginPath(); if (n.rest) x.rect(px - 0.7 * d, py - 1.2 * d, 1.4 * d, 2.4 * d); else x.arc(px, py, 0.85 * d, 0, 7); x.fill(); x.stroke();
+      const t = label(n) + (!n.rest && n.alter > 0 ? '♯' : !n.rest && n.alter < 0 ? '♭' : '');
       x.fillStyle = 'rgba(255,255,255,.88)'; const tw = x.measureText(t + ' ' + beatsTxt(n.beats)).width + 6, ty = py + (n.y < S.res.staves[n.staff].lines[2] ? -1.3 * d : 2.1 * d);
       x.fillRect(px - tw / 2, ty - 1.0 * d, tw, 1.25 * d);
       x.fillStyle = on ? '#007a4f' : '#0a2a8a'; x.fillText(t + ' ' + beatsTxt(n.beats), px, ty);
@@ -106,7 +120,7 @@
     $('sc-del').style.display = S.blob ? '' : 'none';
     $('sc-pick').firstElementChild.textContent = tr(S.blob ? 'score.again' : 'score.photo');
     $('sc-busy').style.display = S.busy ? 'block' : 'none'; $('sc-busy').textContent = tr('score.busy');
-    $('sc-info').textContent = S.busy ? '' : !S.blob ? tr('score.empty') : has ? tr('score.found', S.res.staves.length, S.notes.length) : tr('score.none');
+    $('sc-info').textContent = S.busy ? '' : !S.blob ? tr('score.empty') : has ? tr('score.found', S.res.staves.length, S.notes.filter(n => !n.rest).length) + ' ' + tr('score.detected', tr('score.clef.' + (S.res.clef || S.clef)), S.key === 0 ? '♮' : S.key > 0 ? S.key + '♯' : -S.key + '♭', S.notes.filter(n => n.rest).length) : tr('score.none');
     if (!has) return;
     chips($('sc-clef'), [['alto', 'alto'], ['treble', 'treble'], ['bass', 'bass']].map(([k, v]) => [tr('score.clef.' + k), v]), S.clef, v => { S.clef = v; refresh(); });
     const keys = []; for (let k = -7; k <= 7; k++) keys.push([k === 0 ? '♮' : k > 0 ? k + '♯' : -k + '♭', k]);
@@ -125,11 +139,11 @@
   function openSheet(i) {
     S.sel = i; const n = S.notes[i], sh = $('sheet'); if (!n) return closeSheet();
     const dot = !DURS.includes(n.beats) && DURS.includes(n.beats / 1.5), base = dot ? n.beats / 1.5 : n.beats;
-    sh.innerHTML = `<h3></h3><div class="lbl">${tr('edit.pitch')}</div><div class="chips"><button data-a="up">▲</button><button data-a="down">▼</button></div>
-      <div class="lbl">${tr('edit.alter')}</div><div class="chips"><button data-a="alt-1" class="${n.alter < 0 ? 'on' : ''}">♭</button><button data-a="alt0" class="${n.alter === 0 ? 'on' : ''}">♮</button><button data-a="alt1" class="${n.alter > 0 ? 'on' : ''}">♯</button></div>
+    sh.innerHTML = `<h3></h3>${n.rest ? '' : `<div class="lbl">${tr('edit.pitch')}</div><div class="chips"><button data-a="up">▲</button><button data-a="down">▼</button></div>
+      <div class="lbl">${tr('edit.alter')}</div><div class="chips"><button data-a="alt-1" class="${n.alter < 0 ? 'on' : ''}">♭</button><button data-a="alt0" class="${n.alter === 0 ? 'on' : ''}">♮</button><button data-a="alt1" class="${n.alter > 0 ? 'on' : ''}">♯</button></div>`}
       <div class="lbl">${tr('edit.dur')}</div><div class="chips">${DURS.map(b => `<button data-a="d${b}" class="${b === base ? 'on' : ''}">${tr('dur.' + b)}</button>`).join('')}<button data-a="dot" class="${dot ? 'on' : ''}">${tr('edit.dot')}</button></div>
       <div class="chips" style="margin-top:12px"><button class="del" data-a="del">${tr('edit.delete')}</button><button data-a="close">${tr('edit.close')}</button></div>`;
-    sh.querySelector('h3').textContent = label(n) + (n.alter > 0 ? '♯' : n.alter < 0 ? '♭' : '');
+    sh.querySelector('h3').textContent = label(n) + (!n.rest && n.alter > 0 ? '♯' : !n.rest && n.alter < 0 ? '♭' : '');
     sh.classList.add('on');
     sh.querySelectorAll('button').forEach(b => b.onclick = () => {
       const a = b.dataset.a, e = S.edits[n.id] = S.edits[n.id] || {};
@@ -159,11 +173,12 @@
     ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); await ctx.resume(); unlockAudio();
     wave = wave || ctx.createPeriodicWave(new Float32Array([0, 0, 0, 0, 0]), new Float32Array([0, 1, 0.45, 0.2, 0.1]));
     const d = S.res.staves[0].d, groups = []; const sorted = S.notes.map((n, i) => ({ n, i }));
-    for (const it of sorted) { const g = groups[groups.length - 1]; if (g && g.n[0].staff === it.n.staff && Math.abs(g.n[0].x - it.n.x) < 0.8 * d) { g.n.push(it.n); g.i.push(it.i); } else groups.push({ n: [it.n], i: [it.i] }); }
+    for (const it of sorted) { const g = groups[groups.length - 1]; if (g && !it.n.rest && !g.n[0].rest && g.n[0].staff === it.n.staff && Math.abs(g.n[0].x - it.n.x) < 0.8 * d) { g.n.push(it.n); g.i.push(it.i); } else groups.push({ n: [it.n], i: [it.i] }); }
     const spb = 60 / S.bpm, t0 = ctx.currentTime + 0.15; let t = t0; const nodes = [], ev = [];
     for (const g of groups) {
       const dur = g.n[0].beats * spb;
       for (const n of g.n) {
+        if (n.rest) continue;
         const o = ctx.createOscillator(), gn = ctx.createGain(); o.setPeriodicWave(wave); o.frequency.value = OMR.freqOf(n, a4);
         const end = t + dur * 0.96, pk = 0.32 / Math.sqrt(g.n.length);
         gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(pk, t + 0.02); gn.gain.setValueAtTime(pk, Math.max(t + 0.03, end - 0.06)); gn.gain.linearRampToValueAtTime(0, end);
@@ -191,7 +206,7 @@
     stopPlay(); S.busy = true; S.blob = null; S.res = null; S.edits = {}; S.sel = -1; S.notes = []; closeSheet(); render();
     try {
       S.blob = await downscale(file); await kv('set', 'photo', S.blob);
-      S.zoom = 0; await analyze(S.blob); S.clef = S.clef || defClef(); rebuildNotes(); await saveScan();
+      S.zoom = 0; S.clef = null; S.key = 0; await analyze(S.blob); rebuildNotes(); await saveScan();
     } catch (e) { S.res = { staves: [], heads: [] }; }
     S.busy = false; render();
   }
@@ -204,7 +219,13 @@
     if (!S.notes.length) return;
     const cv = $('sc-canvas'), r = cv.getBoundingClientRect(), k = cv.width / r.width, px = (e.clientX - r.left) * k + S.crop.x0, py = (e.clientY - r.top) * k + S.crop.y0, d = S.res.staves[0].d;
     let best = -1, bd = 1e9; S.notes.forEach((n, i) => { const dd = Math.hypot(n.x - px, n.y - py); if (dd < bd) { bd = dd; best = i; } });
-    if (best >= 0 && bd < 1.6 * d) openSheet(best); else closeSheet();
+    if (best >= 0 && bd < 1.6 * d) return openSheet(best);
+    // zone vide : ajoute une note à l'endroit touché (portée la plus proche, hauteur arrondie au demi-interligne)
+    let bs = 0; S.res.staves.forEach((st, i) => { if (Math.abs(st.lines[2] - py) < Math.abs(S.res.staves[bs].lines[2] - py)) bs = i; });
+    const st = S.res.staves[bs], half = st.d / 2, step = Math.round((st.lines[4] - py) / half);
+    if (Math.abs(step) > 14) return closeSheet();
+    S.extra.push({ staff: bs, x: px, y: st.lines[4] - step * half, step, beats: 1 }); rebuildNotes(); saveScan(); render();
+    const ni = S.notes.findIndex(n => n.id === 2000 + S.extra.length - 1); if (ni >= 0) openSheet(ni);
   });
 
   async function load() {
@@ -213,7 +234,7 @@
       const blob = await kv('get', 'photo'), scan = await kv('get', 'scan');
       if (blob) {
         S.blob = blob;
-        if (scan && scan.res) { Object.assign(S, { quarter: scan.quarter, angle: scan.angle, res: scan.res, clef: scan.clef, key: scan.key, bpm: scan.bpm || 90, zoom: scan.zoom || 0, edits: scan.edits || {} }); S.base = await renderBase(blob, S.quarter, S.angle); }
+        if (scan && scan.res) { Object.assign(S, { extra: scan.extra || [], scale: scan.scale || 1, quarter: scan.quarter, angle: scan.angle, res: scan.res, clef: scan.clef, key: scan.key, bpm: scan.bpm || 90, zoom: scan.zoom || 0, edits: scan.edits || {} }); S.base = await renderBase(blob, S.quarter, S.angle, S.scale || 1); }
         else { await analyze(blob); }
         S.clef = S.clef || defClef(); rebuildNotes();
       }

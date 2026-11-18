@@ -107,6 +107,21 @@ const OMR = (() => {
     }
     return B2;
   }
+  // Rétablit les pixels de ligne effacés qui reliaient deux morceaux d'un même trait (bémol, dièse, bécarre coupés par une ligne).
+  function repairLines(B, B2, w, h, staves) {
+    const B3 = B2.slice();
+    for (const s of staves) {
+      const band = Math.max(2, Math.ceil((s.lineT || s.t) / 2) + 1);
+      for (const ly of s.lines) { const yc = Math.round(ly);
+        for (let x = s.x0; x <= s.x1; x++) for (let y = yc - band; y <= yc + band; y++) {
+          if (!B[y * w + x] || B2[y * w + x]) continue;
+          let up = false, dn = false;
+          for (let k = 1; k <= 2; k++) { if (B2[(y - k) * w + x]) up = true; if (B2[(y + k) * w + x]) dn = true; }
+          if (up && dn) B3[y * w + x] = 1;
+        } }
+    }
+    return B3;
+  }
   const ellipse = (a, b) => { const o = []; for (let dy = -Math.ceil(b); dy <= Math.ceil(b); dy++) for (let dx = -Math.ceil(a); dx <= Math.ceil(a); dx++) if ((dx * dx) / (a * a) + (dy * dy) / (b * b) <= 1) o.push([dx, dy]); return o; };
   function components(mask, w, h, x0, y0, x1, y1) {   // composantes connexes d'un masque, centroïdes
     const seen = new Uint8Array(w * h), out = [];
@@ -120,11 +135,12 @@ const OMR = (() => {
     }
     return out;
   }
-  function findHeads(B, B2, w, h, s, dbg) {
+  function findHeads(B, B2, w, h, s, dbg, hollowOK) {
     const d = s.d, top = s.lines[0], bot = s.lines[4];
-    const y0 = Math.max(2, Math.round(top - 3.6 * d)), y1 = Math.min(h - 3, Math.round(bot + 3.6 * d));
-    const xs = Math.max(2, Math.round(s.x0 + 3.0 * d)), xe = Math.min(w - 3, s.x1);   // après la clé
-    const xsH = Math.round(s.x0 + (s.first ? 6.5 : 4.2) * d);                        // têtes creuses : 1re portée, après le chiffrage (« C », « 4/4 »…)
+    const y0 = Math.max(2, Math.round(top - 5.2 * d)), y1 = Math.min(h - 3, Math.round(bot + 5.2 * d));
+    const hdr = s.hasHeader ? s.keyEnd : s.x0 + 3.5 * d;          // début de la musique : après la clé et l'armure
+    const xs = Math.max(2, Math.round(hdr + 0.3 * d)), xe = Math.min(w - 3, s.x1);
+    const xsH = Math.round(hdr + (s.first ? 3.2 : 0.5) * d);          // têtes creuses : 1re portée, après le chiffrage                        // têtes creuses : 1re portée, après le chiffrage (« C », « 4/4 »…)
     const fill = ellipse(0.56 * d, 0.40 * d), mF = new Uint8Array(w * h), mH = new Uint8Array(w * h);
     const mk = (ao, bo, af, bf, side) => {
       const outer = ellipse(ao * d, bo * d), inner = new Set(ellipse(0.28 * d, 0.14 * d).map(p => p[0] + ',' + p[1]));
@@ -179,7 +195,7 @@ const OMR = (() => {
     const r07 = Math.round(0.75 * d);
     const nearFilled = (x, y) => { for (let dy = -r07; dy <= r07; dy++) for (let dx = -r07; dx <= r07; dx++) if (mF[(y + dy) * w + x + dx]) return true; return false; };
     for (let y = y0; y <= y1; y++) for (let x = xsH; x <= xe; x++)
-      if (!nearFilled(x, y) && TPL.some(T => isHollow(x, y, T)) && !nearBar(x)) mH[y * w + x] = 1;
+      if (hollowOK && !nearFilled(x, y) && !nearBar(x) && hollowOK(x, y) && TPL.some(T => isHollow(x, y, T))) mH[y * w + x] = 1;
     const filled = components(mF, w, h, xs, y0, xe, y1).filter(c => c.n >= 2).map(c => ({ ...c, hollow: false }));
     const hollow = components(mH, w, h, xs, y0, xe, y1).filter(c => c.n >= 2).map(c => ({ ...c, hollow: true }));
     if (dbg) dbg.mH = mH;
@@ -198,7 +214,17 @@ const OMR = (() => {
     let fb = 0, fn = 0; for (const [dx, dy] of far) if (!skip[y + dy]) { fn++; fb += B[(y + dy) * w + x + dx]; }
     return { holeBlack: hb, holeN: hn, ring: +(rb / rn).toFixed(2), ringN: rn, ringTot: ring.length, far: +(fb / fn).toFixed(2) };
   }
-  const runLen = (B2, w, h, x, y, dir, max) => { let n = 0; for (let yy = y; yy >= 0 && yy < h && n < max; yy += dir) { if (!B2[yy * w + x]) break; n++; } return n; };
+  // Longueur d'un trait vertical (hampe) : tolère un décalage latéral de 2 px au plus et des trous de ≤ 3 lignes (ligne de portée effacée).
+  const runLen = (B2, w, h, x, y, dir, max) => {
+    let n = 0, cx = x, gap = 0;
+    for (let yy = y; yy >= 0 && yy < h && n < max; yy += dir) {
+      if (B2[yy * w + cx]) { gap = 0; n++; continue; }
+      if (Math.abs(cx - 1 - x) <= 0 && B2[yy * w + cx - 1]) { cx--; gap = 0; n++; continue; }
+      if (Math.abs(cx + 1 - x) <= 0 && B2[yy * w + cx + 1]) { cx++; gap = 0; n++; continue; }
+      if (++gap > 3) return n - 3; n++;
+    }
+    return n - gap;
+  };
   function addStem(B2, w, h, hd, d) {
     let best = null;
     for (const side of [1, -1]) {           // hampe à droite (vers le haut) ou à gauche (vers le bas)
@@ -221,24 +247,25 @@ const OMR = (() => {
     if (hd.stem) {
       if (hd.hollow) hd.flags = 0;
       else {
-        const st = hd.stem, win = Math.min(1.9 * d, st.len - 1.1 * d), a = st.endY - st.dir * 0.15 * d, b = st.endY - st.dir * win;
+        // crochets / ligatures : traits horizontaux croisés en partant du bout de la hampe vers la tête ;
+        // le 1er doit toucher le bout (≤ 0.5d), le 2e ≤ 1.25d, le 3e ≤ 2.0d (écarte les altérations voisines)
+        const st = hd.stem, L = Math.min(2.8 * d, st.len - 1.0 * d), minT = Math.max(2, 0.17 * d), lim = [1.0 * d, 1.7 * d, 2.4 * d];
         let best = 0;
-        for (const side of [1, -1]) for (const o of [0.5, 0.7, 0.9]) best = Math.max(best, countRuns(B2, w, h, Math.round(st.x + side * o * d), a, b, Math.max(2, 0.17 * d)));
+        for (const side of [1, -1]) for (const o of [0.5, 0.7, 0.9]) {
+          const x = Math.round(st.x + side * o * d); let k = 0, cnt = 0;
+          while (k <= L && cnt < 3) {
+            const y = Math.round(st.endY - st.dir * k);
+            if (y < 0 || y >= h || !B2[y * w + x]) { k++; continue; }
+            let k1 = k; while (k1 <= L && B2[Math.round(st.endY - st.dir * k1) * w + x]) k1++;
+            if (k1 - k >= minT && k <= lim[cnt]) cnt++; else if (k1 - k >= minT) break;
+            k = k1 + 1;
+          }
+          best = Math.max(best, cnt);
+        }
         hd.flags = Math.min(best, 3);
       }
     }
-    // point de prolongation : petit amas noir isolé (ne touchant pas le bord de la zone) à droite de la tête
-    const bx0 = Math.round(hd.x + 0.80 * d), bx1 = Math.round(hd.x + 1.75 * d), by0 = Math.round(hd.y - 0.6 * d), by1 = Math.round(hd.y + 0.6 * d);
-    const seen = new Set();
-    for (let y = by0; y <= by1 && !hd.dots; y++) for (let x = bx0; x <= bx1; x++) {
-      if (!B2[y * w + x] || seen.has(y * w + x)) continue;
-      const st = [[x, y]]; seen.add(y * w + x); let n = 0, edge = false, mnx = 1e9, mxx = -1, mny = 1e9, mxy = -1;
-      while (st.length) { const [cx, cy] = st.pop(); n++; mnx = Math.min(mnx, cx); mxx = Math.max(mxx, cx); mny = Math.min(mny, cy); mxy = Math.max(mxy, cy);
-        if (cx <= bx0 || cx >= bx1 || cy <= by0 || cy >= by1) edge = true;
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = cx + dx, ny = cy + dy;
-          if (nx >= bx0 && nx <= bx1 && ny >= by0 && ny <= by1 && B2[ny * w + nx] && !seen.has(ny * w + nx)) { seen.add(ny * w + nx); st.push([nx, ny]); } } }
-      if (!edge && n >= 0.05 * d * d && n <= 0.35 * d * d && mxx - mnx <= 0.6 * d && mxy - mny <= 0.6 * d) { hd.dots = 1; break; }
-    }
+    hd.dots = dotAfter(B2, w, h, hd.x + 0.72 * d, hd.y, d) ? 1 : 0;
   }
   // img: ImageData (déjà réduite). Retourne le résultat de l'analyse + l'angle estimé.
   function analyzeGray(g, w, h) {
@@ -246,22 +273,233 @@ const OMR = (() => {
     const angle = estimateAngle(B, w, h);
     return { B, angle };
   }
-  function analyzeStraight(g, w, h, dbg) {
+
+  // ---------- nettoyage, composantes, symboles ----------
+  // Efface les petites taches (bruit de photo / JPEG) : composantes 8-connexes de moins de minArea pixels.
+  function despeckle(M, w, h, minArea) {
+    const seen = new Uint8Array(w * h), st = [];
+    for (let i = 0; i < w * h; i++) {
+      if (!M[i] || seen[i]) continue;
+      const comp = [i]; seen[i] = 1; st.length = 0; st.push(i);
+      while (st.length) { const p = st.pop(), x = p % w, y = (p - x) / w;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue; const q = ny * w + nx; if (M[q] && !seen[q]) { seen[q] = 1; st.push(q); comp.push(q); } }
+        if (comp.length >= minArea) break; }
+      if (comp.length < minArea) for (const q of comp) M[q] = 0;
+      else { // grande composante : on finit le marquage sans stocker
+        while (st.length) { const p = st.pop(), x = p % w, y = (p - x) / w;
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue; const q = ny * w + nx; if (M[q] && !seen[q]) { seen[q] = 1; st.push(q); } } } }
+    }
+  }
+  // Composantes connexes (8-voisins) d'une zone ; remplit lab (identifiants > 0) et renvoie leurs boîtes englobantes.
+  function labelRegion(M, w, h, x0, y0, x1, y1, lab, id0) {
+    const comps = []; let id = id0; const st = [];
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      if (!M[y * w + x] || lab[y * w + x]) continue;
+      id++; lab[y * w + x] = id; st.length = 0; st.push(y * w + x);
+      let mnx = x, mxx = x, mny = y, mxy = y, area = 0, sx = 0, sy = 0;
+      while (st.length) { const p = st.pop(), px = p % w, py = (p - px) / w; area++; sx += px; sy += py;
+        if (px < mnx) mnx = px; if (px > mxx) mxx = px; if (py < mny) mny = py; if (py > mxy) mxy = py;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = px + dx, ny = py + dy;
+          if (nx < x0 || nx > x1 || ny < y0 || ny > y1) continue; const q = ny * w + nx; if (M[q] && !lab[q]) { lab[q] = id; st.push(q); } } }
+      comps.push({ id, x0: mnx, x1: mxx, y0: mny, y1: mxy, w: mxx - mnx + 1, h: mxy - mny + 1, area, cx: sx / area, cy: sy / area });
+    }
+    return comps;
+  }
+  const process_debug = false;
+  const GW = 10, GH = 14;
+  function gridOf(lab, w, c) {                                  // empreinte normalisée (fraction de pixels de la composante par cellule)
+    const g = new Float32Array(GW * GH), cnt = new Float32Array(GW * GH);
+    for (let y = c.y0; y <= c.y1; y++) for (let x = c.x0; x <= c.x1; x++) {
+      const gx = Math.min(GW - 1, Math.floor((x - c.x0) * GW / c.w)), gy = Math.min(GH - 1, Math.floor((y - c.y0) * GH / c.h)), k = gy * GW + gx;
+      cnt[k]++; const L = lab[y * w + x]; if (c.ids ? c.ids.has(L) : L === c.id) g[k]++;
+    }
+    for (let k = 0; k < g.length; k++) g[k] = cnt[k] ? g[k] / cnt[k] : 0;
+    return g;
+  }
+  const gridScore = (a, b) => { let mn = 0, mx = 0; for (let k = 0; k < a.length; k++) { mn += Math.min(a[k], b[k]); mx += Math.max(a[k], b[k]); } return mx ? mn / mx : 0; };
+  // Barres de mesure : colonnes noires sur toute la hauteur de la portée (sans la dépasser), regroupées.
+  function findBars(B, w, h, s) {
+    const top = Math.round(s.lines[0]), bot = Math.round(s.lines[4]), staffH = bot - top, cols = [];
+    for (let x = s.x0; x <= s.x1; x++) {
+      let ok = true; for (let y = top; y <= bot; y++) if (!B[y * w + x]) { ok = false; break; }
+      if (!ok) continue; let u = top; while (u > 0 && B[(u - 1) * w + x]) u--; let v = bot; while (v < h - 1 && B[(v + 1) * w + x]) v++;
+      if (v - u <= staffH + 2 * s.t + 4) cols.push(x);
+    }
+    const bars = []; for (const x of cols) { const l = bars[bars.length - 1]; if (l && x - l.x1 <= 0.6 * s.d) { l.x1 = x; } else bars.push({ x0: x, x1: x }); }
+    return bars.map(b => (b.x0 + b.x1) / 2);
+  }
+  // Point de prolongation à droite de (x, y) : petit amas noir isolé.
+  function dotAfter(B2, w, h, xStart, y, d) {
+    const bx0 = Math.round(xStart), bx1 = Math.round(xStart + 1.0 * d), by0 = Math.round(y - 0.95 * d), by1 = Math.round(y + 0.7 * d), seen = new Set();
+    for (let yy = by0; yy <= by1; yy++) for (let x = bx0; x <= bx1; x++) {
+      if (!B2[yy * w + x] || seen.has(yy * w + x)) continue;
+      const st = [[x, yy]]; seen.add(yy * w + x); let n = 0, edge = false, mnx = 1e9, mxx = -1, mny = 1e9, mxy = -1;
+      while (st.length) { const [cx, cy] = st.pop(); n++; mnx = Math.min(mnx, cx); mxx = Math.max(mxx, cx); mny = Math.min(mny, cy); mxy = Math.max(mxy, cy);
+        if (cx <= bx0 || cx >= bx1 || cy <= by0 || cy >= by1) edge = true;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = cx + dx, ny = cy + dy; if (nx >= bx0 && nx <= bx1 && ny >= by0 && ny <= by1 && B2[ny * w + nx] && !seen.has(ny * w + nx)) { seen.add(ny * w + nx); st.push([nx, ny]); } } }
+      if (!edge && n >= 0.04 * d * d && n <= 0.40 * d * d && mxx - mnx <= 0.6 * d && mxy - mny <= 0.6 * d) return true;
+    }
+    return false;
+  }
+  // Classe une composante hors-tête : { type, score } avec type ∈ sharp, flat, natural, rest4, rest8, rest16, rest2, rest1, null.
+  function classifySymbol(c, s, lab, w, TPL, minScore = 0.50) {
+    const d = s.d, wd = c.w / d, hd = c.h / d, top = s.lines[0], bot = s.lines[4];
+    // pauses : blocs pleins et plats posés sur / suspendus à une ligne
+    const fillR = c.area / (c.w * c.h);
+    if (wd >= 0.85 && wd <= 1.9 && hd >= 0.3 && hd <= 0.8 && fillR > 0.8) {
+      const q = (bot - top) / 4;
+      if (Math.abs(c.y1 - (top + 2 * q)) <= 0.35 * d) return { type: 'rest2', score: 1 };    // blanche : posée sur la 3e ligne
+      if (Math.abs(c.y0 - (top + 1 * q)) <= 0.35 * d) return { type: 'rest1', score: 1 };    // ronde : suspendue à la 2e ligne
+      return { type: null, score: 0 };
+    }
+    if (!TPL) return { type: null, score: 0 };
+    const g = gridOf(lab, w, c); let best = { type: null, score: 0 };
+    for (const [name, t] of Object.entries(TPL)) {
+      if (Math.abs(wd - t.w) > Math.max(0.3, 0.38 * t.w) || Math.abs(hd - t.h) > Math.max(0.35, 0.30 * t.h)) continue;
+      const sc = gridScore(g, t.grid); if (sc > best.score) best = { type: name, score: sc };
+    }
+    return best.score >= minScore ? best : { type: null, score: best.score };
+  }
+  // Morceaux voisins d'un même symbole (trait coupé par une ligne de portée) : tente la fusion de c avec les 1-2 suivants.
+  function mergeTry(cs, k, s, lab, w, TPL, accept) {
+    for (let n = 1; n <= 3 && k + n < cs.length; n++) {
+      const parts = cs.slice(k, k + n + 1); let ok = true;
+      for (let q = 1; q < parts.length; q++) if (parts[q].x0 - Math.max(...parts.slice(0, q).map(p => p.x1)) > 0.6 * s.d) ok = false;
+      if (!ok) continue;
+      const m = { ids: new Set(parts.map(p => p.id)), x0: Math.min(...parts.map(p => p.x0)), x1: Math.max(...parts.map(p => p.x1)), y0: Math.min(...parts.map(p => p.y0)), y1: Math.max(...parts.map(p => p.y1)), area: parts.reduce((a, p) => a + p.area, 0), id: -1 };
+      m.w = m.x1 - m.x0 + 1; m.h = m.y1 - m.y0 + 1; m.cx = (m.x0 + m.x1) / 2; m.cy = (m.y0 + m.y1) / 2;
+      const cl = classifySymbol(m, s, lab, w, TPL, 0.36), t = cl.type;
+      if (process_debug) console.log('merge', n, t, cl.score.toFixed(2), m.w, m.h);
+      if (accept(t)) return { m, parts, type: t };
+    }
+    return null;
+  }
+  // Clé : composante la plus à gauche (hors barre de système), reconnue à sa hauteur.
+  function clefOf(c, s) {
+    const hd = c.h / s.d, top = s.lines[0], bot = s.lines[4];
+    if (hd >= 5.0) return 'treble';
+    if (hd >= 3.4 && hd <= 4.9 && c.y0 >= top - 0.7 * s.d && c.y1 <= bot + 0.7 * s.d) return 'alto';
+    if (hd >= 2.2 && hd < 3.5 && c.y0 >= top - 0.7 * s.d) return 'bass';
+    return null;
+  }
+  // Étape 1 d'une portée : composantes, clé et armure (avant la détection des têtes de notes).
+  function readHeader(B3, w, h, s, lab, TPL, out) {
+    const d = s.d, top = s.lines[0], bot = s.lines[4], y0 = Math.max(0, Math.round(top - 4 * d)), y1 = Math.min(h - 1, Math.round(bot + 4 * d));
+    const comps = labelRegion(B3, w, h, Math.max(0, s.x0 - 2), y0, Math.min(w - 1, s.x1 + 2), y1, lab, out.nextId || 0);
+    out.nextId = comps.length ? comps[comps.length - 1].id : (out.nextId || 0);
+    const cand = comps.filter(c => c.area >= 0.04 * d * d && c.x0 >= s.x0 - 1.5 * d && c.y0 > top - 3.2 * d && c.y1 < bot + 3.6 * d && c.cy > top - 2.4 * d && c.cy < bot + 2.8 * d).sort((a, b) => a.x0 - b.x0);
+    let i = 0; while (i < cand.length && cand[i].w < 0.5 * d && cand[i].h > 3 * d && cand[i].x0 < s.x0 + 1.0 * d && false) i++;
+    const isAcc = c => { const t = classifySymbol(c, s, lab, w, TPL).type; return t === 'sharp' || t === 'flat' || t === 'natural' ? t : null; };
+    s.clef = null; s.key = 0; s.keyEnd = s.x0; s.hasHeader = false;
+    // clé = pièces collées au début de portée, jusqu'à la première altération reconnue
+    let k = 0, xe = s.x0, mnY = 1e9, mxY = -1, pieces = [];
+    while (k < cand.length && cand[k].x0 < xe + 1.2 * d + (k === 0 ? 2 * d : 0) && (k === 0 || cand[k].x0 < s.x0 + 3.4 * d) && !(k > 0 && isAcc(cand[k]))) {
+      pieces.push(cand[k]); xe = Math.max(xe, cand[k].x1); mnY = Math.min(mnY, cand[k].y0); mxY = Math.max(mxY, cand[k].y1); k++; if (xe > s.x0 + 5 * d) break;
+    }
+    // barre de système isolée (fine et haute) : on l'écarte avant d'analyser la clé
+    if (pieces.length > 1 && pieces[0].w < 0.45 * d && pieces[0].h > 3 * d) { const bx = pieces[0]; pieces = pieces.slice(1); mnY = Math.min(...pieces.map(p => p.y0)); mxY = Math.max(...pieces.map(p => p.y1)); }
+    if (pieces.length) {
+      const big = { h: mxY - mnY + 1, y0: mnY, y1: mxY }; s.clef = clefOf(big, s); s.hasHeader = true;
+      pieces.forEach(c => { c.used = 'clef'; }); s.keyEnd = xe;
+      let n = 0, kind = 0;
+      while (k < cand.length && cand[k].x0 - xe < 1.8 * d) {
+        let t = isAcc(cand[k]), used = [cand[k]];
+        if (!t) { const mg = mergeTry(cand, k, s, lab, w, TPL, q => q === 'sharp' || q === 'flat' || q === 'natural'); if (!mg) break; t = mg.type; used = mg.parts; }
+        const kd = t === 'sharp' ? 1 : t === 'flat' ? -1 : 0; if (kd && kind && kd !== kind) break; if (kd) kind = kd;
+        n++; used.forEach(c => { c.used = 'key'; xe = Math.max(xe, c.x1); }); k += used.length; if (n >= 7) break;
+      }
+      s.key = kind * n; s.keyEnd = xe;
+    }
+    return comps;
+  }
+  // Une tête hors portée doit s'appuyer sur ses lignes supplémentaires (sinon : texte, annotation, bruit).
+  function ledgerOK(B, w, h, s, hd) {
+    const top = s.lines[0], bot = s.lines[4], st = (bot - top) / 4, d = s.d;
+    let dist, base, sign; if (hd.y < top) { dist = top - hd.y; base = top; sign = -1; } else if (hd.y > bot) { dist = hd.y - bot; base = bot; sign = 1; } else return true;
+    const m = Math.floor((dist + 0.25 * st) / st); if (m < 1) return true;
+    const yl = Math.round(base + sign * m * st); let best = 0;
+    for (let dy = -1; dy <= 1; dy++) { let n = 0, tot = 0; for (let x = Math.round(hd.x - 0.7 * d); x <= Math.round(hd.x + 0.7 * d); x++) { tot++; if (B[(yl + dy) * w + x]) n++; } best = Math.max(best, n / tot); }
+    return best >= 0.85;
+  }
+  // Étape 2 : type de chaque composante hors tête (altération, silence, barre…).
+  function typeComps(w, h, s, heads, comps, lab, TPL, out, si) {
+    const d = s.d, top = s.lines[0], bot = s.lines[4];
+    const headComp = new Set(); for (const hd of heads) if (!hd.hollow) { const p = lab[Math.round(hd.y) * w + Math.round(hd.x)]; if (p) headComp.add(p); }
+    const rest = comps.filter(c => !headComp.has(c.id) && !c.used && c.area >= 0.06 * d * d && c.x0 > s.keyEnd - 0.2 * d);
+    for (const c of rest) {
+      if (out.raw && !(c.w < 0.45 * d && c.h > 2.5 * d)) out.raw.push({ staff: si, x: c.cx, xRel: (c.x0 - s.x0) / d, wd: c.w / d, hd: c.h / d, area: c.area / (d * d), grid: Array.from(gridOf(lab, w, c)) });
+      if (c.w < 0.45 * d && c.h > 2.5 * d) { c.type = 'bar'; continue; }
+      if (c.w > 3.6 * d || c.h > 5.2 * d) { c.type = 'other'; continue; }
+      const sy = classifySymbol(c, s, lab, w, TPL); c.type = sy.type || 'other'; c.score = sy.score;
+    }
+    const rs = rest.filter(c => c.type === 'other' && c.area < 1.2 * d * d).sort((a, b) => a.x0 - b.x0);       // morceaux d'altérations coupés par une ligne
+    for (let k = 0; k < rs.length; k++) { const mg = mergeTry(rs, k, s, lab, w, TPL, q => q === 'sharp' || q === 'flat' || q === 'natural'); if (mg) { mg.parts.forEach(p => { p.type = 'other'; p.used = 'part'; }); const m = mg.m; m.type = mg.type; m.id = mg.parts[0].id; comps.push(m); k += mg.parts.length - 1; } }
+    return headComp;
+  }
+  // Étape 3 : rattache altérations aux notes, enregistre les silences.
+  function attachSymbols(B, B2, w, h, s, si, heads, comps, headComp, out) {
+    const d = s.d, top = s.lines[0], bot = s.lines[4];
+    s.bars = findBars(B, w, h, s);
+    const accs = comps.filter(c => /^(sharp|flat|natural)$/.test(c.type || '')), rests = comps.filter(c => /^rest/.test(c.type || '') && c.cy > top - 0.8 * d && c.cy < bot + 0.8 * d);
+    for (const hd of heads) {
+      let best = null, bd = 1e9;
+      for (const a of accs) { const dx = hd.x - a.cx; if (dx < 0.4 * d || dx > 3.0 * d || Math.abs(a.cy - hd.y) > 1.7 * d || a.used) continue; if (dx < bd) { bd = dx; best = a; } }
+      if (best) { hd.acc = best.type === 'sharp' ? 1 : best.type === 'flat' ? -1 : 0; best.used = 'acc'; }
+    }
+    for (const c of rests) {
+      const beats = { rest1: 4, rest2: 2, rest4: 1, rest8: 0.5, rest16: 0.25 }[c.type];
+      out.rests.push({ x: c.cx, y: c.cy, staff: si, beats: beats * (dotAfter(B2, w, h, c.x1 + 0.2 * d, c.cy - (c.type === 'rest4' ? 0.3 : 0) * d, d) ? 1.5 : 1), type: c.type });
+    }
+    out.comps.push(...comps.map(c => ({ staff: si, x: c.cx, y: c.cy, w: c.w, h: c.h, type: c.used || c.type || (headComp.has(c.id) ? 'head' : null) })));
+  }
+  function analyzeStraight(g, w, h, dbg, TPL) {
     const B = binarize(g, w, h), box = paperBox(g, w, h); maskOutside(B, w, h, box);
     const staves = findStaves(B, w, h);
-    if (!staves.length) return { staves: [], heads: [], box };
-    const B2 = removeLines(B, w, h, staves), heads = [];
+    if (!staves.length) return { staves: [], heads: [], rests: [], comps: [], box };
+    const dm = staves[0].d;
+    despeckle(B, w, h, Math.max(3, Math.round(0.03 * dm * dm)));            // nettoyage : taches de bruit
+    const B2 = removeLines(B, w, h, staves); despeckle(B2, w, h, Math.max(3, Math.round(0.04 * dm * dm)));
+    const heads = [], lab = new Int32Array(w * h), out = { rests: [], comps: [], nextId: 0 };
+    if (dbg && dbg.collect) out.raw = [];
+    const B3 = repairLines(B, B2, w, h, staves);
     staves.forEach((s, si) => {
-      for (const hd of findHeads(B, B2, w, h, s, si === 0 ? dbg : null)) {
-        hd.staff = si; addStem(B2, w, h, hd, s.d); classify(B2, w, h, hd, s.d); heads.push(hd);
-      }
+      const comps = readHeader(B3, w, h, s, lab, TPL, out), d = s.d;
+      // 1) têtes pleines  2) types des autres composantes  3) têtes creuses (seulement hors altérations / silences / barres)
+      const hs0 = findHeads(B, B2, w, h, s, si === 0 ? dbg : null, null), cById = new Map(comps.map(c => [c.id, c]));
+      const hs = hs0.filter(hd => { const c = cById.get(lab[Math.round(hd.y) * w + Math.round(hd.x)]); return !c || c.h >= 1.6 * d; });
+      for (const hd of hs) { addStem(B2, w, h, hd, d); classify(B2, w, h, hd, d); }
+      const headComp = typeComps(w, h, s, hs, comps, lab, TPL, out, si), byId = new Map(comps.map(c => [c.id, c]));
+      const ok = (x, y) => {                       // la tête creuse est l'union des morceaux d'anneau autour de (x, y)
+        const ids = new Set(); const R = Math.round(0.9 * d);
+        for (let dy = -2; dy <= 2; dy += 2) for (let k = -R; k <= R; k++) { const id = lab[(y + dy) * w + x + k]; if (id) ids.add(id); }
+        if (!ids.size) return true;
+        let x0 = 1e9, x1 = -1, y0 = 1e9, y1 = -1;
+        for (const id of ids) { const c = byId.get(id); if (!c) continue;
+          if (headComp.has(c.id) || /^(sharp|flat|natural|bar|rest)/.test(c.type || '') || c.used === 'clef' || c.used === 'key') return false;
+          x0 = Math.min(x0, c.x0); x1 = Math.max(x1, c.x1); y0 = Math.min(y0, c.y0); y1 = Math.max(y1, c.y1); }
+        return (x1 - x0 + 1) >= 1.1 * d && (y1 - y0 + 1) >= 0.8 * d && (y1 - y0 + 1) <= 5.2 * d;
+      };
+      for (const hd of findHeads(B, B2, w, h, s, null, ok)) if (hd.hollow) { hd.staff = si; addStem(B2, w, h, hd, d); classify(B2, w, h, hd, d); hs.push(hd); }
+      hs.forEach(hd => { hd.staff = si; });
+      for (let k = hs.length - 1; k >= 0; k--) if (!ledgerOK(B, w, h, s, hs[k])) hs.splice(k, 1);
+      attachSymbols(B, B2, w, h, s, si, hs, comps, headComp, out);
+      heads.push(...hs);
     });
-    if (dbg) dbg.B2 = B2;
-    return { staves, heads, box };
+    // une tête n'appartient qu'à la portée la plus proche (les zones de recherche de portées voisines se recouvrent)
+    const mid = staves.map(s => s.lines[2]);
+    for (let k = heads.length - 1; k >= 0; k--) { const hd = heads[k]; let bi = 0; mid.forEach((m, i) => { if (Math.abs(m - hd.y) < Math.abs(mid[bi] - hd.y)) bi = i; }); if (bi !== hd.staff) heads.splice(k, 1); }
+    // clé / armure de la page : valeur la plus fréquente parmi les portées
+    const mode = arr => { const m = {}; let best = null, bn = 0; for (const v of arr) { m[v] = (m[v] || 0) + 1; if (m[v] > bn) { bn = m[v]; best = v; } } return best; };
+    const clef = mode(staves.map(s => s.clef).filter(Boolean));
+    const ks = staves.map(s => s.key), nz = ks.filter(k => k !== 0);        // une armure oubliée sur une portée est plus probable qu'une armure inventée
+    const key = nz.length && nz.length >= Math.ceil(ks.length / 4) ? mode(nz) : 0;
+    if (dbg) { dbg.B2 = B2; dbg.lab = lab; dbg.raw = out.raw; }
+    return { staves, heads, rests: out.rests, comps: out.comps, clef, key: key == null ? 0 : +key, box };
   }
   // Convertit les têtes détectées en notes jouables (hauteur diatonique + durée en temps).
   function toNotes(res, { clef = 'alto', key = 0 } = {}) {
-    const base = CLEF_BASE[clef] ?? 24, notes = [];
+    const base = CLEF_BASE[clef] ?? 24, items = [];
     for (const [id, hd] of res.heads.entries()) {
       const s = res.staves[hd.staff], bot = s.lines[4], half = s.d / 2;
       const step = Math.round((bot - hd.y) / half), dia = base + step;
@@ -270,10 +508,21 @@ const OMR = (() => {
       else if (hd.hollow) beats = 2;
       else beats = [1, 0.5, 0.25, 0.125][hd.flags] ?? 0.25;
       if (hd.dots) beats *= 1.5;
-      notes.push({ id, staff: hd.staff, x: hd.x, y: hd.y, dia, alter: keyAlter(dia, key), beats });
+      items.push({ id, staff: hd.staff, x: hd.x, y: hd.y, dia, acc: hd.acc, beats });
     }
-    notes.sort((a, b) => a.staff - b.staff || a.x - b.x);
-    return notes;
+    (res.rests || []).forEach((r, i) => items.push({ id: 1000 + i, staff: r.staff, x: r.x, y: r.y, rest: true, beats: r.beats }));
+    items.sort((a, b) => a.staff - b.staff || a.x - b.x);
+    // altérations : armure, puis altération accidentelle valable jusqu'à la barre de mesure suivante
+    let cur = -1, bars = [], memo = {}, meas = -1;
+    for (const n of items) {
+      if (n.staff !== cur) { cur = n.staff; bars = res.staves[cur].bars || []; memo = {}; meas = -1; }
+      const m = bars.filter(bx => bx < n.x - 2).length;
+      if (m !== meas) { meas = m; memo = {}; }
+      if (n.rest) continue;
+      if (n.acc !== undefined) memo[n.dia] = n.acc;
+      n.alter = memo[n.dia] !== undefined ? memo[n.dia] : keyAlter(n.dia, key);
+    }
+    return items;
   }
   function keyAlter(dia, key) {
     const li = ((dia % 7) + 7) % 7;
@@ -284,6 +533,6 @@ const OMR = (() => {
   const midiOf = n => 12 * (Math.floor(n.dia / 7) + 1) + SEMI[((n.dia % 7) + 7) % 7] + n.alter;
   const freqOf = (n, a4 = 440) => a4 * Math.pow(2, (midiOf(n) - 69) / 12);
   const nameOf = n => LETTERS[((n.dia % 7) + 7) % 7] + (n.alter > 0 ? '♯' : n.alter < 0 ? '♭' : '') + Math.floor(n.dia / 7);
-  return { _i: { removeLines, ellipse, hollowDiag, paperBox }, toGray, binarize, estimateAngle, findStaves, analyzeStraight, analyzeGray, toNotes, keyAlter, midiOf, freqOf, nameOf };
+  return { _i: { removeLines, ellipse, hollowDiag, paperBox, dotAfter, countRuns }, CLEF_BASE, toGray, binarize, estimateAngle, findStaves, analyzeStraight, analyzeGray, toNotes, keyAlter, midiOf, freqOf, nameOf };
 })();
 if (typeof module !== 'undefined') module.exports = OMR;
