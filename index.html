@@ -63,6 +63,27 @@ nav button.on{background:var(--card);color:var(--ok)}
 .soon{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--mut);text-align:center}
 .soon svg{width:72px;height:72px;fill:none;stroke:var(--mut);stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
 .soon h2{margin:0;color:var(--fg)}
+
+#v-metronome{align-items:center;gap:14px;padding-bottom:16px;position:relative}
+#bpm{font-size:104px;font-weight:700;line-height:1;margin-top:14px;font-variant-numeric:tabular-nums}
+#tname{color:var(--mut);font-size:18px;letter-spacing:.04em;text-transform:capitalize;min-height:24px}
+.bpmrow{display:flex;align-items:center;gap:12px;width:100%}
+.bpmrow button{flex:none;width:52px;height:52px;border-radius:50%;border:0;background:var(--card);color:var(--fg);font-size:28px}
+.bpmrow input{flex:1;accent-color:var(--ok);height:40px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.chips button,.opts button{padding:9px 14px;border-radius:20px;border:0;background:var(--card);color:var(--mut);font-size:15px}
+.chips button.on,.opts button.on{background:var(--fg);color:var(--bg)}
+.lbl{font-size:12px;color:var(--mut);letter-spacing:.08em;text-transform:uppercase;align-self:flex-start;margin-top:4px}
+.dots{display:flex;gap:12px;justify-content:center;align-items:center;min-height:40px;flex-wrap:wrap}
+.dot{width:22px;height:22px;border-radius:50%;background:#222c38;transition:background .05s,transform .05s}
+.dot.acc{width:30px;height:30px;border:2px solid #3a4858}
+.dot.lit{background:var(--ok);transform:scale(1.15)}
+.dot.acc.lit{background:var(--warn)}
+.opts{display:flex;gap:8px;justify-content:center}
+#mgo{width:100%;padding:18px;font-size:22px;font-weight:700;border:0;border-radius:16px;background:var(--ok);color:#04130c;margin-top:auto}
+#mgo.on{background:var(--bad);color:#fff}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:5;transition:opacity .25s ease-out}
+#flash.f{opacity:.22;transition:none}
 </style>
 </head>
 <body>
@@ -76,13 +97,24 @@ nav button.on{background:var(--card);color:var(--ok)}
 <section class="view" id="v-accueil">
   <div class="isles">
     <button class="isle t" data-go="accordeur"><svg viewBox="0 0 24 24"><path d="M3.5 17a8.5 8.5 0 0 1 17 0"/><path d="M12 17 16.5 9"/><circle cx="12" cy="17" r="1.2"/><path d="M12 8.5V7M6.8 10.3l-.9-.9M17.2 10.3l.9-.9"/></svg>Accordeur<small>Alto · Violon · Guitare</small></button>
-    <button class="isle m" data-go="metronome"><svg viewBox="0 0 24 24"><path d="M8.5 3h7l3.5 17.5H5z"/><path d="M12 16.5 15.5 7"/><path d="M13.3 10.5h3.2"/></svg>Métronome<small>Bientôt</small></button>
+    <button class="isle m" data-go="metronome"><svg viewBox="0 0 24 24"><path d="M8.5 3h7l3.5 17.5H5z"/><path d="M12 16.5 15.5 7"/><path d="M13.3 10.5h3.2"/></svg>Métronome<small>Tempo · Mesure · Tap</small></button>
   </div>
 </section>
 
 <section class="view" id="v-metronome">
-  <div class="soon"><svg viewBox="0 0 24 24"><path d="M8.5 3h7l3.5 17.5H5z"/><path d="M12 16.5 15.5 7"/><path d="M13.3 10.5h3.2"/></svg><h2>Métronome</h2><div>Bientôt disponible.</div></div>
+  <div id="bpm">100</div>
+  <div id="tname"></div>
+  <div class="bpmrow"><button id="bm" aria-label="Moins">−</button><input id="bslide" type="range" min="30" max="250" step="1"><button id="bp" aria-label="Plus">+</button></div>
+  <div class="opts"><button id="tap">👆 Tap tempo</button></div>
+  <div class="lbl">Mesure</div>
+  <div class="chips" id="tsig"></div>
+  <div class="lbl">Subdivision</div>
+  <div class="chips" id="subs"></div>
+  <div class="dots" id="dots"></div>
+  <div class="opts"><button id="oflash">Flash écran</button><button id="osound">Son</button></div>
+  <button id="mgo">Démarrer</button>
 </section>
+<div id="flash"></div>
 
 <section class="view" id="v-accordeur">
 <header>
@@ -289,6 +321,98 @@ $('start').onclick = async () => {
 };
 renderStrings(); updatePlay();
 
+
+// ================= MÉTRONOME =================
+const SIGS = {'2/4':{n:2,acc:[0]},'3/4':{n:3,acc:[0]},'4/4':{n:4,acc:[0]},'6/8':{n:6,acc:[0,3]},'Libre':{n:4,acc:[]}};
+const SUBS = [['Noires',1],['Croches',2],['Triolets',3],['Doubles',4]];
+const M = Object.assign({bpm:100, sig:'4/4', sub:1, flash:false, sound:true},
+  (() => { try { return JSON.parse(localStorage.getItem('metro')) || {}; } catch (e) { return {}; } })());
+if (!SIGS[M.sig]) M.sig = '4/4';
+let mRun = false, mNext = 0, mBeat = 0, mSub = 0, mTimer = null, mQueue = [], mRaf = 0, mWake = null;
+const saveM = () => { try { localStorage.setItem('metro', JSON.stringify(M)); } catch (e) {} };
+
+function tempoName(b){
+  return b<40?'grave':b<60?'largo':b<66?'larghetto':b<76?'adagio':b<108?'andante':b<120?'moderato':b<156?'allegro':b<176?'vivace':b<200?'presto':'prestissimo';
+}
+function setBpm(v){
+  M.bpm = Math.max(30, Math.min(250, Math.round(v)));
+  $('bpm').textContent = M.bpm; $('bslide').value = M.bpm; $('tname').textContent = tempoName(M.bpm); saveM();
+}
+function renderChips(){
+  const mk = (box, items, cur, fn) => { box.innerHTML=''; items.forEach(([label, val]) => {
+    const b = document.createElement('button'); b.textContent = label; if (val === cur) b.className = 'on';
+    b.onclick = () => { fn(val); renderChips(); }; box.appendChild(b); }); };
+  mk($('tsig'), Object.keys(SIGS).map(k => [k, k]), M.sig, v => { M.sig = v; mBeat = 0; mSub = 0; saveM(); });
+  mk($('subs'), SUBS, M.sub, v => { M.sub = v; mSub = 0; saveM(); });
+  const d = $('dots'); d.innerHTML = '';
+  for (let i = 0; i < SIGS[M.sig].n; i++) { const e = document.createElement('div'); e.className = 'dot' + (SIGS[M.sig].acc.includes(i) ? ' acc' : ''); d.appendChild(e); }
+  $('oflash').classList.toggle('on', M.flash); $('osound').classList.toggle('on', M.sound);
+  $('osound').textContent = M.sound ? '🔊 Son' : '🔇 Muet';
+}
+function click(time, kind){            // kind: 2 accent fort, 1 temps, 0 subdivision
+  if (!M.sound) return;
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  const [hz, vol] = kind === 2 ? [1500, 1] : kind === 3 ? [1250, .85] : kind === 1 ? [1000, .7] : [800, .3];
+  o.frequency.value = hz; o.type = 'square';
+  g.gain.setValueAtTime(0, time); g.gain.linearRampToValueAtTime(vol * .5, time + .002); g.gain.exponentialRampToValueAtTime(.0001, time + .045);
+  o.connect(g).connect(ctx.destination); o.start(time); o.stop(time + .06);
+}
+function mSchedule(){
+  const sig = SIGS[M.sig];
+  while (mNext < ctx.currentTime + 0.12) {
+    const main = mSub === 0, kind = !main ? 0 : (mBeat === 0 && sig.acc.length) ? 2 : sig.acc.includes(mBeat) ? 3 : 1;
+    click(mNext, kind);
+    mQueue.push({t: mNext, beat: mBeat, main, kind});
+    mNext += 60 / M.bpm / M.sub;
+    if (++mSub >= M.sub) { mSub = 0; mBeat = (mBeat + 1) % sig.n; }
+  }
+}
+function mDraw(){
+  const dots = $('dots').children;
+  while (mQueue.length && mQueue[0].t <= ctx.currentTime) {
+    const e = mQueue.shift();
+    if (e.main) {
+      [...dots].forEach(d => d.classList.remove('lit')); dots[e.beat]?.classList.add('lit');
+      if (M.flash && ctx.currentTime - e.t < .1) { const f = $('flash'); f.classList.add('f'); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove('f'))); }
+    }
+  }
+  if (mRun) mRaf = requestAnimationFrame(mDraw);
+}
+async function startMetro(){
+  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+  await ctx.resume();
+  mRun = true; mBeat = 0; mSub = 0; mQueue = []; mNext = ctx.currentTime + 0.08;
+  mTimer = setInterval(mSchedule, 25); mSchedule(); mDraw();
+  $('mgo').textContent = 'Stop'; $('mgo').classList.add('on');
+  navigator.wakeLock?.request('screen').then(w => { mWake = w; }).catch(() => {});
+}
+function stopMetro(){
+  if (!mRun) return;
+  mRun = false; clearInterval(mTimer); cancelAnimationFrame(mRaf); mQueue = [];
+  [...$('dots').children].forEach(d => d.classList.remove('lit'));
+  $('mgo').textContent = 'Démarrer'; $('mgo').classList.remove('on');
+  try { mWake && mWake.release(); } catch (e) {} mWake = null;
+}
+$('mgo').onclick = () => mRun ? stopMetro() : startMetro();
+$('oflash').onclick = () => { M.flash = !M.flash; saveM(); renderChips(); };
+$('osound').onclick = () => { M.sound = !M.sound; saveM(); renderChips(); };
+$('bslide').oninput = e => setBpm(+e.target.value);
+function holdBtn(id, delta){           // appui long = répétition
+  const b = $(id); let t, i;
+  const stop = () => { clearTimeout(t); clearInterval(i); };
+  b.addEventListener('pointerdown', e => { e.preventDefault(); setBpm(M.bpm + delta); t = setTimeout(() => { i = setInterval(() => setBpm(M.bpm + delta), 70); }, 400); });
+  ['pointerup','pointerleave','pointercancel'].forEach(ev => b.addEventListener(ev, stop));
+}
+holdBtn('bm', -1); holdBtn('bp', 1);
+let taps = [];
+$('tap').onclick = () => {
+  const now = performance.now();
+  if (taps.length && now - taps[taps.length - 1] > 2000) taps = [];
+  taps.push(now); taps = taps.slice(-6);
+  if (taps.length > 1) setBpm(60000 / ((taps[taps.length - 1] - taps[0]) / (taps.length - 1)));
+};
+setBpm(M.bpm); renderChips();
+
 // --- navigation (#accueil, #accordeur, #metronome)
 function stopMic(){
   stopTone();
@@ -300,6 +424,7 @@ function stopMic(){
 function route(){
   const page = ['accueil','accordeur','metronome'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'accueil';
   if (page !== 'accordeur' && analyser) stopMic();
+  if (page !== 'metronome') stopMetro();
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'v-' + page));
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.go === page));
 }
