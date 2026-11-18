@@ -99,15 +99,15 @@ document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
   renderStrings(); updatePlay();
 });
 
-function analyse(f){
+function analyse(f, idx){
   const scale = a4/440;
   if (mode !== 'chro' && target !== null) {
     const [n,hz] = TUNINGS[mode][target], t = hz*scale;
     return {label:n, oct:TUNINGS[mode][target][2], cents:1200*Math.log2(f/t), hz:t};
   }
   if (mode !== 'chro') { // corde la plus proche
-    let best = 0, bd = 1e9;
-    TUNINGS[mode].forEach(([n,hz],i) => { const d = Math.abs(Math.log2(f/(hz*scale))); if (d<bd){bd=d;best=i;} });
+    let best = idx ?? 0, bd = 1e9;
+    if (idx === undefined) TUNINGS[mode].forEach(([n,hz],i) => { const d = Math.abs(Math.log2(f/(hz*scale))); if (d<bd){bd=d;best=i;} });
     const [n,hz] = TUNINGS[mode][best], t = hz*scale;
     if (near !== best) { near = best; renderStrings(); }
     return {label:n, oct:TUNINGS[mode][best][2], cents:1200*Math.log2(f/t), hz:t};
@@ -149,15 +149,16 @@ function render(){
 render();
 const median = a => { const b = [...a].sort((x,y)=>x-y); return b[b.length>>1]; };
 
-// plage de recherche : serrée autour de la corde choisie, sinon autour de l'instrument
-function searchRange(){
-  const sc = a4 / 440, T = TUNINGS[mode];
-  if (!T) return [60, 1200];
-  if (target !== null) { const hz = T[target][1] * sc; return [hz * 0.8, hz * 1.25]; }
-  const hzs = T.map(x => x[1] * sc);
-  return [Math.min(...hzs) * 0.8, Math.max(...hzs) * 1.25];
+// Instruments : détection ciblée autour des cordes (pas d'erreur d'octave). Chromatique : YIN.
+let pend = 0, pendKey = null;
+function detect(){
+  const T = TUNINGS[mode], sc = a4 / 440;
+  if (!T) { const x = detectPitchEx(buf, ctx.sampleRate, 60, 1200); return x.freq > 0 && x.clarity > 0.7 ? {...x, idx: undefined} : {rms: x.rms, freq: -1}; }
+  const ids = target !== null ? [target] : T.map((_, k) => k);
+  const wins = ids.map(k => ({hz: T[k][1] * sc, tol: target !== null ? 0.15 : 0.10}));
+  const x = detectNearest(buf, ctx.sampleRate, wins);
+  return x.index < 0 ? {rms: x.rms, freq: -1} : {...x, idx: ids[x.index]};
 }
-let missed = 0;
 function loop(){
   requestAnimationFrame(loop);
   if (tone) { lastHeard = performance.now(); return; }
@@ -166,13 +167,19 @@ function loop(){
   lastDetect = now;
   if (ctx.state !== 'running') { ctx.resume().catch(() => {}); $('msg').textContent = 'Micro en pause… touchez l’écran.'; return; }
   analyser.getFloatTimeDomainData(buf);
-  const [lo, hi] = searchRange();
-  const res = detectPitchEx(buf, ctx.sampleRate, lo, hi);
+  const res = detect();
   $('lvl').style.width = Math.min(100, Math.sqrt(res.rms || 0) * 220) + '%';
-  if (res.freq > 0 && res.clarity > 0.7) {
-    missed = 0; lastHeard = now;
+  if (res.freq > 0) {
+    lastHeard = now;
     $('msg').textContent = 'Écoute en cours…';
-    const r = analyse(res.freq);
+    const r = analyse(res.freq, res.idx);
+    if (res.idx !== undefined && target === null && near !== res.idx) { near = res.idx; renderStrings(); }
+    const key = r.label + r.oct;
+    if (key !== histLabel && histLabel !== null && active) {   // nouvelle note : confirmée sur 3 mesures consécutives
+      pend = pendKey === key ? pend + 1 : 1; pendKey = key;
+      if (pend < 3) return;
+    }
+    pend = 0; pendKey = null;
     if (r.label + r.oct !== histLabel) { hist = []; histLabel = r.label + r.oct; fc = r.cents; needleAng = needleTgt = ang(r.cents); }
     hist.push(r.cents); if (hist.length > 7) hist.shift();
     fc += (median(hist) - fc) * 0.35;

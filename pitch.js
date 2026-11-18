@@ -36,4 +36,35 @@ function detectPitchEx(buf, sampleRate, minHz = 60, maxHz = 1200, gate = 0.002) 
   return { freq: sampleRate / (tau + Math.max(-1, Math.min(1, shift))), clarity: 1 - d[tau], rms };
 }
 function detectPitch(buf, sampleRate, minHz, maxHz) { return detectPitchEx(buf, sampleRate, minHz, maxHz).freq; }
-if (typeof module !== 'undefined') module.exports = { detectPitch, detectPitchEx };
+
+// Détection ciblée (NSDF/MPM) : on cherche la hauteur seulement autour des notes attendues
+// (fenêtres [hz*(1-tol), hz*(1+tol)]) et on garde la fenêtre la plus convaincante.
+// Aucune erreur d'octave possible entre cordes ; robuste aux fondamentales faibles.
+// wins: [{hz, tol}] -> {index, freq, clarity, rms}
+function detectNearest(buf, sr, wins, gate = 0.002) {
+  let rms = 0;
+  for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
+  rms = Math.sqrt(rms / buf.length);
+  const none = { index: -1, freq: -1, clarity: 0, rms };
+  if (rms < gate) return none;
+  const res = wins.map((w, index) => {
+    const t0 = Math.max(2, Math.floor(sr / (w.hz * (1 + w.tol)))), t1 = Math.ceil(sr / (w.hz * (1 - w.tol)));
+    const W = buf.length - t1 - 1; if (W < t1) return { index, clarity: 0 };
+    const n = new Float32Array(t1 + 2);
+    for (let tau = t0 - 1; tau <= t1 + 1; tau++) {
+      let r = 0, m = 0;
+      for (let i = 0; i < W; i++) { const a = buf[i], b = buf[i + tau]; r += a * b; m += a * a + b * b; }
+      n[tau] = m ? 2 * r / m : 0;
+    }
+    let best = t0; for (let t = t0; t <= t1; t++) if (n[t] > n[best]) best = t;
+    const a = n[best - 1], b = n[best], c = n[best + 1], den = a - 2 * b + c;
+    const shift = den < 0 ? Math.max(-1, Math.min(1, 0.5 * (a - c) / den)) : 0;
+    return { index, clarity: b, freq: sr / (best + shift), hz: w.hz };
+  });
+  const top = Math.max(...res.map(x => x.clarity));
+  if (top < 0.75) return none;
+  // en cas d'égalité, la note la plus aiguë (sous-multiples d'une note grave plus aiguë)
+  const cand = res.filter(x => x.clarity >= top - 0.04).sort((x, y) => y.hz - x.hz)[0];
+  return { index: cand.index, freq: cand.freq, clarity: cand.clarity, rms };
+}
+if (typeof module !== 'undefined') module.exports = { detectPitch, detectPitchEx, detectNearest };

@@ -17,4 +17,24 @@ for (const sr of [44100, 48000]) for (const [name, f, o] of cases) {
   const ok = Math.abs(err) < 2; if (!ok) bad++;
   console.log(sr, name.padEnd(26), r.freq > 0 ? err.toFixed(2).padStart(6) + ' ¢' : '  rien', 'clarté', r.clarity.toFixed(2), ok ? '' : '<-- ÉCHEC');
 }
-process.exit(bad ? 1 : 0);
+
+// --- détection ciblée par corde : chaque corde, désaccordée de -40 à +40 cents, timbres variés
+const { detectNearest } = require('./pitch.js');
+const SETS = {
+  alto: [130.81, 196, 293.66, 440], violon: [196, 293.66, 440, 659.26],
+  guitare: [82.41, 110, 146.83, 196, 246.94, 329.63],
+};
+let bad2 = 0, tot = 0;
+for (const sr of [44100, 48000]) for (const [inst, hzs] of Object.entries(SETS)) {
+  const wins = hzs.map(hz => ({ hz, tol: 0.10 }));
+  hzs.forEach((hz, k) => {
+    for (const cents of [-40, 0, 25]) for (const harm of [[1, .25, .1], [.1, 1, .7, .4], [.3, 1, .8, .5, .3]]) {
+      const f = hz * Math.pow(2, cents / 1200);
+      const r = detectNearest(sig(f, sr, 8192, { amp: .02, noise: .004, harm }), sr, wins);
+      const err = r.index === k ? 1200 * Math.log2(r.freq / f) : NaN;
+      tot++; if (!(Math.abs(err) < 3)) { bad2++; console.log('ÉCHEC', sr, inst, hz, cents, harm.join(','), 'trouvé index', r.index, err); }
+    }
+  });
+}
+console.log(`détection ciblée: ${tot - bad2}/${tot} OK`);
+process.exit(bad || bad2 ? 1 : 0);
