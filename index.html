@@ -57,6 +57,7 @@ main{flex:1;width:100%;max-width:460px;display:flex;flex-direction:column;align-
   <div class="strings" id="strings"></div>
   <button id="play" disabled>🔊 Jouer la note</button>
   <button id="start">Démarrer</button>
+  <div id="level" style="width:100%;max-width:340px;height:4px;background:var(--card);border-radius:2px;overflow:hidden"><div id="lvl" style="height:100%;width:0;background:var(--ok);transition:width .1s"></div></div>
   <div id="msg">Touchez « Démarrer » et autorisez le micro.</div>
 </main>
 <script src="pitch.js"></script>
@@ -148,24 +149,36 @@ function render(){
 render();
 const median = a => { const b = [...a].sort((x,y)=>x-y); return b[b.length>>1]; };
 
+// plage de recherche : serrée autour de la corde choisie, sinon autour de l'instrument
+function searchRange(){
+  const sc = a4 / 440, T = TUNINGS[mode];
+  if (!T) return [60, 1200];
+  if (target !== null) { const hz = T[target][1] * sc; return [hz * 0.8, hz * 1.25]; }
+  const hzs = T.map(x => x[1] * sc);
+  return [Math.min(...hzs) * 0.8, Math.max(...hzs) * 1.25];
+}
+let missed = 0;
 function loop(){
   requestAnimationFrame(loop);
   if (tone) { lastHeard = performance.now(); return; }
   const now = performance.now();
-  if (now - lastDetect < 40) return;
+  if (now - lastDetect < 50) return;
   lastDetect = now;
+  if (ctx.state !== 'running') { ctx.resume().catch(() => {}); $('msg').textContent = 'Micro en pause… touchez l’écran.'; return; }
   analyser.getFloatTimeDomainData(buf);
-  const f = detectPitch(buf, ctx.sampleRate);
-  if (f > 0) {
-    lastHeard = now;
-    const r = analyse(f);
-    // changement de note : on repart de zéro, sinon médiane + lissage sur les cents
+  const [lo, hi] = searchRange();
+  const res = detectPitchEx(buf, ctx.sampleRate, lo, hi);
+  $('lvl').style.width = Math.min(100, Math.sqrt(res.rms || 0) * 220) + '%';
+  if (res.freq > 0 && res.clarity > 0.7) {
+    missed = 0; lastHeard = now;
+    $('msg').textContent = 'Écoute en cours…';
+    const r = analyse(res.freq);
     if (r.label + r.oct !== histLabel) { hist = []; histLabel = r.label + r.oct; fc = r.cents; needleAng = needleTgt = ang(r.cents); }
-    hist.push(r.cents); if (hist.length > 5) hist.shift();
-    fc += (median(hist) - fc) * 0.4;
+    hist.push(r.cents); if (hist.length > 7) hist.shift();
+    fc += (median(hist) - fc) * 0.35;
     r.cents = fc;
     show(r, r.hz * Math.pow(2, fc / 1200));
-  } else if (now - lastHeard > 600) { idle(); if (near !== null) { near = null; renderStrings(); } }
+  } else if (now - lastHeard > 900) { idle(); if (near !== null) { near = null; renderStrings(); } }
 }
 
 function curTarget(){
@@ -205,9 +218,13 @@ $('start').onclick = async () => {
     ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
     await ctx.resume();
     const src = ctx.createMediaStreamSource(stream);
-    analyser = ctx.createAnalyser(); analyser.fftSize = 4096;
+    analyser = ctx.createAnalyser(); analyser.fftSize = 8192; analyser.smoothingTimeConstant = 0;
     buf = new Float32Array(analyser.fftSize);
     src.connect(analyser);
+    ctx.onstatechange = () => { if (ctx.state !== 'running') ctx.resume().catch(() => {}); };
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) ctx.resume().catch(() => {}); });
+    document.addEventListener('touchstart', () => { if (ctx.state !== 'running') ctx.resume().catch(() => {}); }, {passive:true});
+    stream.getAudioTracks()[0].onended = () => { $('msg').textContent = 'Micro coupé. Rechargez la page.'; };
     $('start').style.display = 'none'; $('msg').textContent = 'Jouez une note…';
     navigator.wakeLock?.request('screen').catch(()=>{});
     loop();

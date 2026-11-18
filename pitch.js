@@ -1,37 +1,39 @@
-// Détection de hauteur (algorithme YIN simplifié). Retourne la fréquence en Hz ou -1.
-function detectPitch(buf, sampleRate, minHz = 60, maxHz = 1200) {
+// Détection de hauteur (YIN). detectPitchEx -> {freq, clarity} (freq=-1 si rien), clarity 0..1.
+function detectPitchEx(buf, sampleRate, minHz = 60, maxHz = 1200, gate = 0.002) {
   let rms = 0;
   for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
   rms = Math.sqrt(rms / buf.length);
-  if (rms < 0.01) return -1;
+  if (rms < gate) return { freq: -1, clarity: 0, rms };
 
-  const half = Math.floor(buf.length / 2);
   const tauMin = Math.max(2, Math.floor(sampleRate / maxHz));
-  const tauMax = Math.min(half - 1, Math.floor(sampleRate / minHz));
-  const d = new Float32Array(tauMax + 1);
-  for (let tau = 1; tau <= tauMax; tau++) {
+  const tauMax = Math.floor(sampleRate / minHz);
+  const W = buf.length - tauMax - 1;           // fenêtre fixe, indépendante de tau
+  if (W < tauMax) return { freq: -1, clarity: 0, rms };
+  const d = new Float32Array(tauMax + 2);
+  for (let tau = 1; tau <= tauMax + 1; tau++) {
     let sum = 0;
-    for (let i = 0; i < half; i++) { const x = buf[i] - buf[i + tau]; sum += x * x; }
+    for (let i = 0; i < W; i++) { const x = buf[i] - buf[i + tau]; sum += x * x; }
     d[tau] = sum;
   }
-  // différence normalisée cumulée
-  let run = 0;
-  d[0] = 1;
-  for (let tau = 1; tau <= tauMax; tau++) { run += d[tau]; d[tau] = run ? d[tau] * tau / run : 1; }
+  let run = 0; d[0] = 1;
+  for (let tau = 1; tau <= tauMax + 1; tau++) { run += d[tau]; d[tau] = run ? d[tau] * tau / run : 1; }
 
-  const threshold = 0.12;
+  // premier creux sous le seuil ; sinon, creux global (cordes frottées : fondamentale faible)
   let tau = -1;
-  for (let t = tauMin; t < tauMax; t++) {
-    if (d[t] < threshold) {
-      while (t + 1 < tauMax && d[t + 1] < d[t]) t++;
-      tau = t; break;
-    }
+  for (let t = tauMin; t <= tauMax; t++) {
+    if (d[t] < 0.15) { while (t + 1 <= tauMax && d[t + 1] < d[t]) t++; tau = t; break; }
   }
-  if (tau === -1) return -1;
-  // interpolation parabolique
-  const a = d[tau - 1], b = d[tau], c = d[tau + 1] ?? d[tau];
+  if (tau === -1) {
+    let best = tauMin;
+    for (let t = tauMin; t <= tauMax; t++) if (d[t] < d[best]) best = t;
+    if (d[best] > 0.35) return { freq: -1, clarity: 0, rms };
+    tau = best;
+    // évite l'erreur d'octave : si 2*tau est presque aussi bon, on garde tau (hauteur la plus aiguë cohérente)
+  }
+  const a = d[tau - 1], b = d[tau], c = d[tau + 1];
   const denom = 2 * (2 * b - a - c);
   const shift = denom ? (c - a) / denom : 0;
-  return sampleRate / (tau + shift);
+  return { freq: sampleRate / (tau + Math.max(-1, Math.min(1, shift))), clarity: 1 - d[tau], rms };
 }
-if (typeof module !== 'undefined') module.exports = { detectPitch };
+function detectPitch(buf, sampleRate, minHz, maxHz) { return detectPitchEx(buf, sampleRate, minHz, maxHz).freq; }
+if (typeof module !== 'undefined') module.exports = { detectPitch, detectPitchEx };
