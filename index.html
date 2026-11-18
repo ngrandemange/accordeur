@@ -31,6 +31,7 @@ main{flex:1;width:100%;max-width:460px;display:flex;flex-direction:column;align-
 #cents{font-size:22px;font-variant-numeric:tabular-nums;min-height:28px}
 .strings{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .strings button{min-width:52px;padding:10px 0;border-radius:10px;border:0;background:var(--card);color:var(--fg);font-size:16px}
+.strings button.near{background:#233042}
 .strings button.on{outline:2px solid var(--ok)}
 #start{padding:16px 40px;font-size:20px;border:0;border-radius:14px;background:var(--ok);color:#04130c;font-weight:700}
 #msg{color:var(--mut);text-align:center;font-size:14px;min-height:20px}
@@ -45,7 +46,7 @@ main{flex:1;width:100%;max-width:460px;display:flex;flex-direction:column;align-
   <div class="ref"><button id="m">−</button><span id="a4">A4 = 440 Hz</span><button id="p">+</button></div>
 </header>
 <main>
-  <div class="modes"><button data-mode="chro" class="on">Chromatique</button><button data-mode="guit">Guitare</button><button data-mode="uke">Ukulélé</button></div>
+  <div class="modes"><button data-mode="alto">Alto</button><button data-mode="violon">Violon</button><button data-mode="chro">Chromatique</button><button data-mode="guit">Guitare</button></div>
   <div id="note">–</div>
   <div id="freq"></div>
   <div class="meter">
@@ -63,11 +64,13 @@ main{flex:1;width:100%;max-width:460px;display:flex;flex-direction:column;align-
 <script>
 const NAMES = ['Do','Do♯','Ré','Ré♯','Mi','Fa','Fa♯','Sol','Sol♯','La','La♯','Si'];
 const TUNINGS = {
-  guit: [['Mi',82.41],['La',110],['Ré',146.83],['Sol',196],['Si',246.94],['Mi',329.63]],
-  uke:  [['Sol',392],['Do',261.63],['Mi',329.63],['La',440]]
+  guit: [['Mi',82.41,2],['La',110,2],['Ré',146.83,3],['Sol',196,3],['Si',246.94,3],['Mi',329.63,4]],
+  alto: [['Do',130.81,3],['Sol',196,3],['Ré',293.66,4],['La',440,4]],
+  violon: [['Sol',196,3],['Ré',293.66,4],['La',440,4],['Mi',659.26,5]]
 };
 const $ = id => document.getElementById(id);
-let a4 = +localStorage.getItem('a4') || 440, mode = 'chro', target = null;
+let a4 = +localStorage.getItem('a4') || 440, mode = localStorage.getItem('mode') || 'alto', target = null, near = null;
+if (!TUNINGS[mode] && mode !== 'chro') mode = 'alto';
 let ctx, analyser, buf, smooth = null, lastHeard = 0;
 
 function setA4(v){ a4 = Math.min(460, Math.max(415, v)); localStorage.setItem('a4', a4); $('a4').textContent = `A4 = ${a4} Hz`; }
@@ -77,14 +80,15 @@ $('m').onclick = () => setA4(a4-1); $('p').onclick = () => setA4(a4+1);
 function renderStrings(){
   const box = $('strings'); box.innerHTML = '';
   (TUNINGS[mode] || []).forEach((s,i) => {
-    const b = document.createElement('button'); b.textContent = s[0];
+    const b = document.createElement('button'); b.innerHTML = `${s[0]}<small style="color:var(--mut)">${s[2]}</small>`;
     b.onclick = () => { target = target === i ? null : i; renderStrings(); };
-    if (target === i) b.className = 'on';
+    if (target === i) b.className = 'on'; else if (target === null && near === i) b.className = 'near';
     box.appendChild(b);
   });
 }
+document.querySelectorAll('.modes button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
 document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
-  mode = b.dataset.mode; target = null;
+  mode = b.dataset.mode; target = null; near = null; localStorage.setItem('mode', mode);
   document.querySelectorAll('.modes button').forEach(x => x.classList.toggle('on', x === b));
   renderStrings();
 });
@@ -99,6 +103,7 @@ function analyse(f){
     let best = 0, bd = 1e9;
     TUNINGS[mode].forEach(([n,hz],i) => { const d = Math.abs(Math.log2(f/(hz*scale))); if (d<bd){bd=d;best=i;} });
     const [n,hz] = TUNINGS[mode][best], t = hz*scale;
+    if (near !== best) { near = best; renderStrings(); }
     return {label:n, oct:'', cents:1200*Math.log2(f/t), hz:t};
   }
   const midi = Math.round(69 + 12*Math.log2(f/a4));
@@ -131,7 +136,7 @@ function loop(){
     // lissage, mais saut direct si la hauteur change nettement
     smooth = (smooth && Math.abs(1200*Math.log2(f/smooth)) < 80) ? smooth*0.6 + f*0.4 : f;
     lastHeard = now; show(analyse(smooth), smooth);
-  } else if (now - lastHeard > 600) { smooth = null; idle(); }
+  } else if (now - lastHeard > 600) { smooth = null; idle(); if (near !== null) { near = null; renderStrings(); } }
   requestAnimationFrame(loop);
 }
 
