@@ -53,4 +53,4 @@ Les exigences, spécifications et plans sont des fichiers **HTML autonomes** (r�
 
 ## Git
 
-Branche de travail actuelle : `claude/confident-bohr-d0d9y0` (`main` ne contient que le README initial). GitHub Pages sert la racine de la branche publiée. Ne pas pousser ni créer de tag `vX.Y.Z` sans demande : un tag déclenche les workflows Android (APK) et PC (installateurs) et crée une Release.
+Branche principale : `main` (contient tout le code). GitHub Pages sert la racine de la branche publiée. Ne pas pousser ni créer de tag `vX.Y.Z` sans demande : un tag déclenche les workflows Android (APK) et PC (installateurs) et crée une Release.
