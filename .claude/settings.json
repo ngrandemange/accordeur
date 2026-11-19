@@ -6,6 +6,9 @@
       "Bash(node test.js)",
       "Bash(node tests/omr-check.js)",
       "Bash(node tools/build.js:*)",
+      "Bash(npm run apk)",
+      "Bash(npm run apk:offline)",
+      "Bash(npm run dist:win)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)"

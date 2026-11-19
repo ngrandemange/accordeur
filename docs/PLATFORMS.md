@@ -93,7 +93,23 @@ l'APK est alors un fichier de la *Release* GitHub, téléchargeable directement 
 Installation : autoriser « Installer des applis inconnues » pour le navigateur utilisé, ouvrir l'APK, accepter.
 L'APK est signé avec la clé de débogage (suffisant pour votre usage ; pas pour le Play Store).
 
-**Avec Android Studio / SDK sur le portable** : `cd platforms/android && npm install && npm run add-android && npm run apk`.
+**Sur le portable, sans Android Studio** : il faut un **JDK 21** et le **SDK Android** (outils en ligne de commande).
+Windows : `winget install EclipseAdoptium.Temurin.21.JDK`, puis télécharger « Command line tools only » (developer.android.com/studio),
+le dézipper dans `C:\Android\cmdline-tools\latest\`, et :
+```powershell
+& C:\Android\cmdline-tools\latest\bin\sdkmanager.bat --licenses
+& C:\Android\cmdline-tools\latest\bin\sdkmanager.bat "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+```
+Ensuite, à chaque itération :
+```powershell
+cd platforms\android
+npm run apk            # synchronise le site, compile, écrit dist\Accordeur-<version>-android.apk (premier passage : ~4 min)
+npm run apk:offline    # compile seulement, sans réseau ni synchronisation (Gradle a déjà tout en cache)
+```
+`build-apk.js` trouve seul le JDK et le SDK (`JAVA_HOME` / `ANDROID_HOME` ne sont pas nécessaires), installe les dépendances et crée le
+projet Android s'il est absent. Sous Windows il demande à Java d'utiliser le magasin de certificats de Windows **pour son processus seulement** :
+sans cela, un antivirus qui inspecte le HTTPS (Avast…) fait échouer le téléchargement de Gradle (`PKIX path building failed`).
+Rien n'est désactivé : seules les autorités déjà approuvées par Windows sont acceptées.
 
 Alternative sans APK : ouvrir l'adresse HTTPS du NAS (ou de GitHub Pages) dans Chrome sur la tablette › « Installer l'application ».
 

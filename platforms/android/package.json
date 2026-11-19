@@ -7,8 +7,9 @@
     "prepare-app": "node ../../tools/build.js android --out . && node patch-project.js assets",
     "add-android": "npx cap add android && node patch-project.js manifest",
     "sync": "node ../../tools/build.js android --out . && npx cap sync android && node patch-project.js manifest",
-    "apk": "npm run sync && cd android && ./gradlew assembleDebug",
-    "apk:release": "npm run sync && cd android && ./gradlew assembleRelease"
+    "apk": "node build-apk.js debug",
+    "apk:offline": "node build-apk.js debug --offline --no-sync",
+    "apk:release": "node build-apk.js release"
   },
   "dependencies": {
     "@capacitor/android": "^8.6.2",

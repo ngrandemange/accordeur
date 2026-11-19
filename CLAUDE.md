@@ -10,6 +10,8 @@ npm test                               # = node test.js : hauteur (YIN), version
 node tests/omr-check.js                # lecture de partition, nécessite Playwright (tests/omr/*.png)
 npm run build                          # = node tools/build.js all → dist/<cible>/www
 npm run serve                          # build web + serveur NAS en dev → http://localhost:8080
+cd platforms/android && npm run apk    # APK debug → platforms/android/dist/ (JDK 21 + SDK 36 détectés seuls ; apk:offline = sans réseau)
+cd platforms/desktop && npm run dist:win   # installateur + portable → platforms/desktop/release/
 node tools/set-version.js <x.y.z>      # aligne version.js + 3 package.json
 node tools/train-templates.js <dossier de PNG>   # régénère omr-templates.js (sources LilyPond : tools/train/*.ly)
 ```
