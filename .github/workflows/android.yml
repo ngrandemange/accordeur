@@ -1,0 +1,36 @@
+name: Édition tablette Android (APK)
+# Lancement à la main (onglet Actions → « Édition tablette Android » → Run workflow) ou en poussant un tag vX.Y.Z.
+# L'APK produit est signé avec la clé de débogage : il s'installe directement sur une tablette (sources inconnues).
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platforms/android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: android-actions/setup-android@v3
+      - run: npm install --no-audit --no-fund
+      - run: npm run add-android
+      - run: npm run sync
+      - run: ./gradlew assembleDebug --no-daemon
+        working-directory: platforms/android/android
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk "Accordeur-$(node -p "require('../../package.json').version")-android.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: accordeur-android-apk
+          path: platforms/android/Accordeur-*-android.apk
+          if-no-files-found: error
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with: { files: platforms/android/Accordeur-*-android.apk }

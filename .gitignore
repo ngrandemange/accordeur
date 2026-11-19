@@ -1,0 +1,9 @@
+node_modules/
+dist/
+platforms/desktop/www/
+platforms/desktop/release/
+platforms/desktop/build/
+platforms/android/www/
+platforms/android/android/
+platforms/android/node_modules/
+*.log

@@ -1,0 +1,15 @@
+{
+  "name": "accordeur",
+  "version": "1.9.0",
+  "private": true,
+  "description": "Accordeur, métronome et lecteur de partition (PWA) — éditions Web, PC, NAS (Docker) et tablette Android",
+  "scripts": {
+    "test": "node test.js",
+    "build": "node tools/build.js all",
+    "serve": "node tools/build.js web && node platforms/nas/server.js --dev",
+    "version:set": "node tools/set-version.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

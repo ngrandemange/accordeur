@@ -1,0 +1,20 @@
+{
+  "name": "accordeur-android",
+  "version": "1.9.0",
+  "private": true,
+  "description": "Accordeur — édition tablette Android (Capacitor)",
+  "scripts": {
+    "prepare-app": "node ../../tools/build.js android --out . && node patch-project.js assets",
+    "add-android": "npx cap add android && node patch-project.js manifest",
+    "sync": "node ../../tools/build.js android --out . && npx cap sync android && node patch-project.js manifest",
+    "apk": "npm run sync && cd android && ./gradlew assembleDebug",
+    "apk:release": "npm run sync && cd android && ./gradlew assembleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/core": "^8.6.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.2"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "web": {
+    "name": "Web (GitHub Pages)",
+    "edition": "Limitée",
+    "features": { "serviceWorker": true, "pullToRefresh": true, "wideLayout": false, "serverApi": false, "updates": "service-worker" }
+  },
+  "desktop": {
+    "name": "PC (Windows / macOS / Linux)",
+    "edition": "PC",
+    "features": { "serviceWorker": false, "pullToRefresh": false, "wideLayout": true, "serverApi": false, "updates": "installer" }
+  },
+  "nas": {
+    "name": "NAS (conteneur Docker)",
+    "edition": "NAS",
+    "features": { "serviceWorker": true, "pullToRefresh": true, "wideLayout": true, "serverApi": true, "updates": "service-worker" }
+  },
+  "android": {
+    "name": "Tablette Android",
+    "edition": "Tablette",
+    "features": { "serviceWorker": false, "pullToRefresh": true, "wideLayout": true, "serverApi": false, "updates": "apk" }
+  }
+}

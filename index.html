@@ -138,6 +138,15 @@ nav button{width:50px}
 #v-partition .chips{justify-content:flex-start}
 #sc-play{width:100%}
 .isle.s small{opacity:.85}
+
+/* mise en page large : seulement si l'édition l'autorise (PC, NAS, tablette) ET si l'écran est assez large */
+@media (min-width:760px){
+body.wide .view,body.wide #v-accordeur main,body.wide #v-accordeur header{max-width:860px}
+body.wide #sc-wrap{max-height:62vh}
+body.wide .isles{flex-direction:row;flex-wrap:wrap;gap:40px;align-content:center}
+body.wide .isle{width:min(30%,300px)}
+body.wide #v-metronome,body.wide #v-reglages{max-width:620px}
+}
 </style>
 </head>
 <body>
@@ -182,7 +191,7 @@ nav button{width:50px}
   <h2 data-i18n="set.help"></h2>
   <p data-i18n="help.1"></p><p data-i18n="help.2"></p><p data-i18n="help.3"></p><p data-i18n="help.4"></p>
   <h2 data-i18n="set.about"></h2>
-  <p><span data-i18n="set.version"></span> <b id="p-ver"></b></p>
+  <p><span data-i18n="set.version"></span> <b id="p-ver"></b><br><span data-i18n="set.platform"></span> <b id="p-plat"></b></p>
   <div class="lbl" data-i18n="set.notes"></div>
   <div id="p-notes"></div>
 </section>
@@ -226,6 +235,7 @@ nav button{width:50px}
 </main>
 </section>
 <script src="version.js"></script>
+<script src="platform.js"></script>
 <script src="i18n.js"></script>
 <script src="pitch.js"></script>
 <script>
@@ -525,6 +535,7 @@ setBpm(M.bpm); renderChips();
 
 // --- tirer vers le bas pour rafraîchir
 (function(){
+  if (!PLATFORM.has('pullToRefresh')) return;
   const ptr = $('ptr'), gear = ptr.firstElementChild, TH = 60, MAX = 120;
   let y0 = null, pull = 0, busy = false;
   const views = () => document.querySelectorAll('.view');
@@ -601,7 +612,7 @@ function renderSettings(){
     b.onclick = () => { fn(val); renderSettings(); }; box.appendChild(b); }); };
   mk($('p-lang'), [['Français','fr'],['English','en']], LANG, v => { PREFS.lang = LANG = v; savePrefs(); applyLang(); });
   mk($('p-instr'), ['alto','violon','guit','chro'].map(k => [tr('mode.' + k), k]), PREFS.instrument, v => { PREFS.instrument = v; savePrefs(); setMode(v); });
-  $('p-ver').textContent = APP_VERSION;
+  $('p-ver').textContent = APP_VERSION; $('p-plat').textContent = PLATFORM.name;
   const box = $('p-notes'); box.innerHTML = '';
   if (!RELEASES) { box.textContent = tr('notes.none'); return; }
   RELEASES.forEach((rel, i) => {
@@ -629,7 +640,8 @@ fetch('releases.json', {cache: 'no-cache'}).then(r => r.json()).then(j => {
 applyLang();
 // Mise à jour automatique : le service worker est vérifié à chaque ouverture ; si une nouvelle version
 // prend le relais, la page se recharge une fois toute seule.
-if ('serviceWorker' in navigator) {
+if (PLATFORM.has('wideLayout')) document.body.classList.add('wide');
+if ('serviceWorker' in navigator && PLATFORM.has('serviceWorker')) {
   const hadController = !!navigator.serviceWorker.controller;
   let reloaded = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });

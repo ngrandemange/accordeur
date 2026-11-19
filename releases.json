@@ -1,5 +1,19 @@
 [
  {
+  "version": "1.9.0",
+  "date": "2026-11-19",
+  "fr": [
+   "Quatre éditions à partir du même code : Web (GitHub Pages), PC (Windows / macOS / Linux), NAS (conteneur Docker, déployé avec nas-deploy) et tablette Android (APK)",
+   "Le nom de l'édition s'affiche dans Réglages › À propos",
+   "Mise en page élargie sur PC, NAS et tablette"
+  ],
+  "en": [
+   "Four editions from the same code: Web (GitHub Pages), PC (Windows / macOS / Linux), NAS (Docker container, deployed with nas-deploy) and Android tablet (APK)",
+   "The edition name is shown in Settings › About",
+   "Wider layout on PC, NAS and tablet"
+  ]
+ },
+ {
   "version": "1.8.1",
   "date": "2026-11-18",
   "fr": [

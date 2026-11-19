@@ -1,0 +1,19 @@
+{
+  "id": "accordeur",
+  "name": "Accordeur",
+  "version": { "from": "package.json" },
+  "build": { "context": ".", "dockerfile": "platforms/nas/Dockerfile" },
+  "test": { "unit": "npm test" },
+  "run": {
+    "internalPort": 8080,
+    "restart": "unless-stopped",
+    "env": { "TLS": "off", "DATA_DIR": "/data", "WWW_DIR": "/app/www" },
+    "user": "nas-account"
+  },
+  "health": { "type": "http", "path": "/api/health", "timeoutSeconds": 30 },
+  "volumes": {
+    "data": { "container": "/data", "persist": true }
+  },
+  "smokeTest": { "extraChecks": [ { "get": "/", "expect": 200 }, { "get": "/platform.js", "expect": 200 }, { "get": "/sw.js", "expect": 200 } ] },
+  "imageGuard": { "forbid": ["**/.env", "**/*.key", "**/*.pem", "data/**"] }
+}
