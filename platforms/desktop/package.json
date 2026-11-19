@@ -43,6 +43,9 @@
       "allowToChangeInstallationDirectory": true,
       "perMachine": false
     },
+    "portable": {
+      "artifactName": "Accordeur-${version}-${os}-${arch}-portable.${ext}"
+    },
     "mac": {
       "target": [
         "dmg"
